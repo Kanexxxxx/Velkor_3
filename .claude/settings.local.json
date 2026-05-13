@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(npm run *)",
+      "PowerShell(cd \"C:\\\\PASTA3\\\\Velkor_3\"; $gitDir = \\(git rev-parse --git-dir 2>$null\\); $gitCommon = \\(git rev-parse --git-common-dir 2>$null\\); \"GIT_DIR: $gitDir\"; \"GIT_COMMON: $gitCommon\"; git branch --show-current; git log --oneline -5)",
+      "Bash(node src/server.js)",
+      "PowerShell(node \"C:\\\\PASTA3\\\\Velkor_3\\\\backend\\\\src\\\\server.js\")"
+    ]
+  }
+}
