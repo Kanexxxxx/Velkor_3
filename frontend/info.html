@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VELKOR — Informações</title>
+<meta name="description" content="Central de suporte, políticas, guias e informações institucionais da Velkor." />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+</head>
+<body>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="logo">VELKOR</a>
+    <nav>
+      <ul class="nav-menu">
+        <li><a href="index.html">Início</a></li>
+        <li><a href="shop.html">Loja</a></li>
+        <li><a href="shop.html?cat=sneakers">Tênis</a></li>
+        <li><a href="shop.html?cat=apparel">Vestuário</a></li>
+        <li><a href="shop.html?cat=accessories">Acessórios</a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <a class="icon-btn" href="account.html" aria-label="Conta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-8 8-8s8 3.582 8 8"/></svg></a>
+      <a class="icon-btn" href="wishlist.html" aria-label="Favoritos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg></a>
+      <button class="icon-btn" id="cartBtn" aria-label="Abrir sacola" aria-controls="cartDrawer" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="cart-count" id="cartCount">0</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="info-page">
+  <div class="container">
+    <div class="crumbs"><a href="index.html">Início</a><span class="sep">/</span><span id="crumbTitle">Informações</span></div>
+    <section class="info-hero">
+      <div>
+        <div class="section-num" id="infoKicker">VELKOR SUPPORT</div>
+        <h1 id="infoTitle">Central <span class="red">Velkor.</span></h1>
+        <p id="infoLead">Encontre políticas, suporte, guias e informações da marca em um único lugar.</p>
+      </div>
+      <a href="info.html?page=contact" class="btn btn-primary" id="infoCta">Falar com Suporte</a>
+    </section>
+
+    <section class="info-layout">
+      <aside class="info-nav" id="infoNav"></aside>
+      <article class="info-content" id="infoContent"></article>
+    </section>
+  </div>
+</main>
+
+<div class="cart-backdrop" id="cartBackdrop"></div>
+<aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-labelledby="cartTitle" aria-hidden="true">
+  <div class="cart-header"><h3 id="cartTitle">Sua Sacola <span class="mono" style="color:var(--muted); font-size:13px;">(<span id="cartItemsCount">0</span>)</span></h3><button class="close" id="cartClose" aria-label="Fechar sacola"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+  <div class="cart-items" id="cartItems"></div>
+  <div class="cart-footer"><div class="cart-totals"><div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">$0</span></div><div class="cart-row"><span>Frete</span><span style="color: var(--red);">GRÁTIS</span></div><div class="cart-row total"><span>Total</span><span id="cartTotal">$0</span></div></div><a href="checkout.html" class="cart-cta">Ir para o checkout</a></div>
+</aside>
+<div class="toast" id="toast">Salvo</div>
+
+<script src="app.js"></script>
+<script>
+const INFO_PAGES = {
+  'shipping-returns': {
+    group: 'Suporte', title: 'Envio e Devoluções', kicker: 'SUPORTE / ENVIO', lead: 'Prazos, frete, trocas e devoluções sem ruído.',
+    blocks: [
+      ['Envio', 'Pedidos acima de $150 têm frete internacional gratuito. O prazo estimado é de 4 a 6 dias úteis para entregas padrão e 1 a 2 dias úteis para expressas.'],
+      ['Devoluções', 'Você pode solicitar devolução em até 30 dias corridos após o recebimento. O produto precisa estar sem uso, com tags e certificado de autenticidade.'],
+      ['Reembolso', 'Após a inspeção do item devolvido, o reembolso é processado para o método de pagamento original em até 7 dias úteis.']
+    ]
+  },
+  'refund-policy': {
+    group: 'Políticas', title: 'Política de Reembolso', kicker: 'POLÍTICA / REEMBOLSO', lead: 'Como a Velkor avalia, aprova e processa reembolsos.',
+    blocks: [
+      ['Elegibilidade', 'Aceitamos reembolso para produtos sem uso, sem lavagem, sem danos e com embalagem original. Itens finais de drop limitado podem ter regras específicas no checkout.'],
+      ['Processamento', 'O reembolso é liberado após conferência do produto. Taxas de entrega expressa, quando escolhidas pelo cliente, não são reembolsáveis.'],
+      ['Exceções', 'Produtos personalizados, danificados por uso inadequado ou enviados sem documentação podem ser recusados.']
+    ]
+  },
+  'size-guide': {
+    group: 'Suporte', title: 'Guia de Tamanhos', kicker: 'SUPORTE / TAMANHOS', lead: 'Medidas simples para reduzir troca e acertar no primeiro pedido.',
+    blocks: [
+      ['Tênis', 'Use sua numeração EU habitual. Se estiver entre dois tamanhos, escolha o maior para modelos Stratum e Orbit.'],
+      ['Vestuário', 'As peças têm modelagem ampla. Para caimento regular, escolha um tamanho abaixo do seu padrão.'],
+      ['Acessórios', 'Bolsas e óculos são tamanho único. Cintos usam grade S, M e L baseada na cintura.']
+    ]
+  },
+  'track-order': {
+    group: 'Suporte', title: 'Rastrear Pedido', kicker: 'SUPORTE / RASTREIO', lead: 'Acompanhe o status do envio com seu código de pedido.',
+    blocks: [
+      ['Como rastrear', 'Use o código recebido por email, como VEL26-018-000284. Em uma integração real, este formulário consultaria a API logística configurada no backend.'],
+      ['Status comuns', 'Processando, separado, enviado, em trânsito, aguardando retirada e entregue.'],
+      ['Problemas', 'Se o rastreio ficar sem atualização por mais de 72 horas úteis, fale com o suporte.']
+    ]
+  },
+  contact: {
+    group: 'Suporte', title: 'Contato', kicker: 'SUPORTE / CONTATO', lead: 'Canais para atendimento, pedidos, imprensa e parcerias.',
+    blocks: [
+      ['Atendimento', 'Email: support@velkor.example. Horário: segunda a sexta, 9h às 18h.'],
+      ['Pedidos', 'Inclua o número do pedido e o email usado na compra para acelerar o atendimento.'],
+      ['Parcerias', 'Para collabs, varejo e imprensa: press@velkor.example.']
+    ]
+  },
+  faq: {
+    group: 'Suporte', title: 'FAQ', kicker: 'SUPORTE / FAQ', lead: 'Respostas rápidas para as dúvidas mais frequentes.',
+    blocks: [
+      ['Os drops voltam', 'Alguns produtos retornam em novas cores, mas edições numeradas não têm reposição garantida.'],
+      ['O carrinho reserva produto', 'Não. O item só é reservado após a confirmação do pedido.'],
+      ['Como uso cupom', 'Insira o código no checkout. O cupom VELKOR15 aplica 15% de desconto nesta demo.']
+    ]
+  },
+  story: {
+    group: 'Marca', title: 'Nossa História', kicker: 'MARCA / HISTÓRIA', lead: 'Velkor nasceu da mistura entre arquitetura urbana, produto técnico e cultura de rua.',
+    blocks: [
+      ['Origem', 'Fundada em Berlim em 2021, a marca começou com cápsulas pequenas, materiais resistentes e silhuetas monolíticas.'],
+      ['Design', 'Cada peça prioriza construção, proporção e durabilidade antes de logotipo.'],
+      ['Comunidade', 'A Velkor cresce em torno de drops limitados, documentação de arquivo e compradores que tratam produto como ritual.']
+    ]
+  },
+  stockists: {
+    group: 'Marca', title: 'Lojas Parceiras', kicker: 'MARCA / LOJAS', lead: 'Pontos selecionados para experimentar e comprar Velkor.',
+    blocks: [
+      ['Berlin', 'Mitte Archive Room, Linienstrasse 42.'],
+      ['Tokyo', 'Signal Store Harajuku, Jingumae 3-12.'],
+      ['São Paulo', 'Concrete Supply, Jardins.']
+    ]
+  },
+  careers: {
+    group: 'Marca', title: 'Carreiras', kicker: 'MARCA / CARREIRAS', lead: 'Trabalhe em produto, conteúdo, operações e tecnologia.',
+    blocks: [
+      ['Áreas', 'Design de produto, engenharia frontend/backend, operações, fotografia e retail experience.'],
+      ['Como aplicar', 'Envie portfólio e currículo para careers@velkor.example.'],
+      ['Cultura', 'Times pequenos, alta exigência visual e foco em execução.']
+    ]
+  },
+  press: {
+    group: 'Marca', title: 'Imprensa', kicker: 'MARCA / IMPRENSA', lead: 'Materiais oficiais, contatos e notas de lançamento.',
+    blocks: [
+      ['Imprensa kit', 'Logo, fotos de campanha e fichas técnicas são liberados sob solicitação.'],
+      ['Contato', 'press@velkor.example.'],
+      ['Uso de imagem', 'Imagens editoriais não podem ser alteradas sem aprovação.']
+    ]
+  },
+  sustainability: {
+    group: 'Marca', title: 'Sustentabilidade', kicker: 'MARCA / SUSTENTABILIDADE', lead: 'Menos excesso, mais durabilidade e transparência material.',
+    blocks: [
+      ['Materiais', 'Priorizamos malhas recicladas, algodão certificado e borrachas pós-consumo quando possível.'],
+      ['Produção', 'Drops menores reduzem sobra de estoque e melhoram controle de qualidade.'],
+      ['Reparo', 'Estamos desenhando um programa de reparo para aumentar a vida útil dos produtos.']
+    ]
+  },
+  privacy: {
+    group: 'Políticas', title: 'Privacidade', kicker: 'POLÍTICA / PRIVACIDADE', lead: 'Como tratamos dados de navegação, conta e pedidos.',
+    blocks: [
+      ['Dados coletados', 'Podemos armazenar email, nome, favoritos e carrinho localmente no navegador nesta versão demo.'],
+      ['Uso', 'Dados são usados para melhorar compra, atendimento e comunicação de pedidos.'],
+      ['Controle', 'Você pode limpar dados locais pelo navegador ou sair da conta na página de conta.']
+    ]
+  },
+  terms: {
+    group: 'Políticas', title: 'Termos de Uso', kicker: 'POLÍTICA / TERMOS', lead: 'Condições gerais de navegação, compra e uso do site.',
+    blocks: [
+      ['Uso do site', 'Ao navegar, você concorda em usar a plataforma de forma lícita e sem tentar comprometer segurança ou disponibilidade.'],
+      ['Produtos', 'Imagens e cores podem variar conforme tela e lote de produção.'],
+      ['Pedidos', 'Pedidos podem ser revisados por prevenção antifraude antes de confirmação final.']
+    ]
+  },
+  cookies: {
+    group: 'Políticas', title: 'Cookies', kicker: 'POLÍTICA / COOKIES', lead: 'Uso de armazenamento local e preferências do navegador.',
+    blocks: [
+      ['Essenciais', 'Usamos armazenamento local para manter carrinho, favoritos e sessão demo.'],
+      ['Analytics', 'Uma versão de produção poderia usar métricas anonimizadas de navegação.'],
+      ['Controle', 'Você pode apagar cookies e dados do site nas configurações do navegador.']
+    ]
+  }
+};
+
+const navGroups = {
+  Suporte: ['shipping-returns', 'size-guide', 'track-order', 'contact', 'faq'],
+  Marca: ['story', 'stockists', 'careers', 'press', 'sustainability'],
+  Políticas: ['privacy', 'terms', 'cookies', 'refund-policy']
+};
+
+const params = new URLSearchParams(location.search);
+const key = INFO_PAGES[params.get('page')] ? params.get('page') : 'shipping-returns';
+const page = INFO_PAGES[key];
+
+document.title = `${page.title} — VELKOR`;
+document.getElementById('crumbTitle').textContent = page.title;
+document.getElementById('infoKicker').textContent = page.kicker;
+document.getElementById('infoTitle').innerHTML = `${page.title.split(' ')[0]} <span class="red">${page.title.split(' ').slice(1).join(' ') || 'Velkor'}.</span>`;
+document.getElementById('infoLead').textContent = page.lead;
+document.getElementById('infoCta').href = 'info.html?page=contact';
+
+document.getElementById('infoNav').innerHTML = Object.entries(navGroups).map(([group, ids]) => `
+  <div>
+    <h4>${group}</h4>
+    ${ids.map(id => `<a class="${id === key ? 'active' : ''}" href="info.html?page=${id}">${INFO_PAGES[id].title}</a>`).join('')}
+  </div>
+`).join('');
+
+document.getElementById('infoContent').innerHTML = page.blocks.map(([title, body]) => `
+  <section class="info-block">
+    <h2>${title}</h2>
+    <p>${body}</p>
+  </section>
+`).join('');
+</script>
+</body>
+</html>

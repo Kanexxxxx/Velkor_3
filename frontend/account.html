@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Conta — VELKOR</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+</head>
+<body>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="logo">VELKOR</a>
+    <nav>
+      <ul class="nav-menu">
+        <li><a href="index.html">Início</a></li>
+        <li><a href="shop.html">Loja</a></li>
+        <li><a href="shop.html?cat=sneakers">Tênis</a></li>
+        <li><a href="shop.html?cat=apparel">Vestuário</a></li>
+        <li><a href="shop.html?cat=accessories">Acessórios</a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <a class="icon-btn active" href="account.html" aria-label="Conta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.418 3.582-8 8-8s8 3.582 8 8"/></svg>
+      </a>
+      <a class="icon-btn" href="wishlist.html" aria-label="Favoritos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </a>
+      <button class="icon-btn" id="cartBtn" aria-label="Abrir sacola" aria-controls="cartDrawer" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="cart-count" id="cartCount">0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="info-page">
+  <div class="container">
+    <div class="crumbs"><a href="index.html">Início</a><span class="sep">/</span><span>Conta</span></div>
+    <div class="info-hero">
+      <div>
+        <div class="section-num">ACESSO DE MEMBRO</div>
+        <h1>Minha <span class="red">Conta.</span></h1>
+        <p>Entre, crie seu cadastro ou encerre a sessão. Nesta versão estática, os dados ficam apenas no seu navegador.</p>
+      </div>
+    </div>
+
+    <section class="account-grid">
+      <form class="form-block" id="loginForm">
+        <h3><span class="num">01</span> Entrar</h3>
+        <div class="sub">Acesse sua conta Velkor</div>
+        <div class="field-row"><div class="field"><label>Email</label><input id="loginEmail" type="email" required /></div></div>
+        <div class="field-row"><div class="field"><label for="loginPassword">Senha</label><input id="loginPassword" type="password" required minlength="6" autocomplete="current-password" /></div></div>
+        <button class="place-order-btn" type="submit">Entrar</button>
+      </form>
+
+      <form class="form-block" id="createForm">
+        <h3><span class="num">02</span> Criar Conta</h3>
+        <div class="sub">Salve seu perfil para próximas visitas</div>
+        <div class="field-row cols-2">
+          <div class="field"><label>Nome</label><input id="accountName" type="text" required /></div>
+          <div class="field"><label>Email</label><input id="accountEmail" type="email" required /></div>
+        </div>
+        <div class="field-row"><div class="field"><label for="createPassword">Senha</label><input id="createPassword" type="password" required minlength="6" autocomplete="new-password" /></div></div>
+        <button class="place-order-btn" type="submit">Criar Conta</button>
+      </form>
+
+      <aside class="summary account-card">
+        <h3>Status</h3>
+        <p id="accountStatus">Nenhuma sessão ativa.</p>
+        <button class="btn btn-ghost" id="logoutBtn" type="button">Sair da Conta</button>
+      </aside>
+    </section>
+  </div>
+</main>
+
+<div class="cart-backdrop" id="cartBackdrop"></div>
+<aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-labelledby="cartTitle" aria-hidden="true">
+  <div class="cart-header"><h3 id="cartTitle">Sua Sacola <span class="mono" style="color:var(--muted); font-size:13px;">(<span id="cartItemsCount">0</span>)</span></h3><button class="close" id="cartClose" aria-label="Fechar sacola"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+  <div class="cart-items" id="cartItems"></div>
+  <div class="cart-footer"><div class="cart-totals"><div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">$0</span></div><div class="cart-row"><span>Frete</span><span style="color: var(--red);">GRÁTIS</span></div><div class="cart-row total"><span>Total</span><span id="cartTotal">$0</span></div></div><a href="checkout.html" class="cart-cta">Ir para o checkout</a></div>
+</aside>
+<div class="toast" id="toast">Salvo</div>
+
+<script src="app.js"></script>
+<script>
+const ACCOUNT_KEY = 'velkor_account_v1';
+const statusEl = document.getElementById('accountStatus');
+const logoutBtn = document.getElementById('logoutBtn');
+
+function readConta() {
+  try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY)); } catch { return null; }
+}
+function writeStatus() {
+  const account = readConta();
+  statusEl.textContent = account ? `Sessão ativa para ${account.name || account.email}.` : 'Nenhuma sessão ativa.';
+  logoutBtn.style.display = account ? 'inline-flex' : 'none';
+}
+writeStatus();
+
+document.getElementById('createForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const account = {
+    name: document.getElementById('accountName').value.trim(),
+    email: document.getElementById('accountEmail').value.trim()
+  };
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+  showToast('Conta criada com sucesso');
+  writeStatus();
+  event.target.reset();
+});
+
+document.getElementById('loginForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ name: email.split('@')[0], email }));
+  showToast('Sessão iniciada');
+  writeStatus();
+  event.target.reset();
+});
+
+logoutBtn.addEventListener('click', () => {
+  localStorage.removeItem(ACCOUNT_KEY);
+  showToast('Sessão encerrada');
+  writeStatus();
+});
+</script>
+</body>
+</html>
