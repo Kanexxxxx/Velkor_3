@@ -26,14 +26,28 @@ const appConfig = {
   ...process.env
 };
 
-function sendJson(res, statusCode, payload) {
+// Origins permitidas — nunca usa wildcard '*'
+const ALLOWED_ORIGINS = appConfig.ALLOWED_ORIGINS
+  ? appConfig.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
+function resolveAllowedOrigin(req) {
+  const origin = req.headers.origin;
+  return (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : null;
+}
+
+function sendJson(res, statusCode, payload, corsOrigin) {
   const body = JSON.stringify(payload);
+  const corsHeaders = corsOrigin ? {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin'
+  } : {};
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
-    'Access-Control-Allow-Origin': process.env.VELKOR_PUBLIC_URL || '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    ...corsHeaders
   });
   res.end(body);
 }
@@ -90,19 +104,25 @@ function readBody(req, maxBytes = 64 * 1024) {
 
 async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const corsOrigin = resolveAllowedOrigin(req);
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': process.env.VELKOR_PUBLIC_URL || '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    });
+    if (corsOrigin) {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Vary': 'Origin'
+      });
+    } else {
+      res.writeHead(403);
+    }
     res.end();
     return;
   }
 
   if (url.pathname === '/api/health' && req.method === 'GET') {
-    sendJson(res, 200, { status: 'ok', service: 'velkor-backend' });
+    sendJson(res, 200, { status: 'ok', service: 'velkor-backend' }, corsOrigin);
     return;
   }
 
@@ -113,30 +133,30 @@ async function handleRequest(req, res) {
       supportEmail: appConfig.VELKOR_SUPPORT_EMAIL || 'velkor.officiall@gmail.com',
       whatsapp: appConfig.VELKOR_WHATSAPP || '+55 16 99706-2339',
       instagram: appConfig.VELKOR_INSTAGRAM || 'https://www.instagram.com/velk.0r/',
-    });
+    }, corsOrigin);
     return;
   }
 
   if (url.pathname === '/api/admin/unlock' && req.method === 'POST') {
     const adminSecret = appConfig.ADMIN_SECRET;
     if (!adminSecret) {
-      sendJson(res, 503, { error: 'Painel admin não configurado no servidor. Defina ADMIN_SECRET no .env.' });
+      sendJson(res, 503, { error: 'Painel admin não configurado no servidor. Defina ADMIN_SECRET no .env.' }, corsOrigin);
       return;
     }
     try {
       const body = await readBody(req);
       const { password } = JSON.parse(body);
       if (typeof password !== 'string' || password !== adminSecret) {
-        sendJson(res, 401, { error: 'Senha incorreta.' });
+        sendJson(res, 401, { error: 'Senha incorreta.' }, corsOrigin);
         return;
       }
-      sendJson(res, 200, { ok: true });
+      sendJson(res, 200, { ok: true }, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {
-        sendJson(res, 413, { error: 'Payload muito grande.' });
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
         return;
       }
-      sendJson(res, 500, { error: 'Erro interno.' });
+      sendJson(res, 500, { error: 'Erro interno.' }, corsOrigin);
     }
     return;
   }
@@ -146,22 +166,22 @@ async function handleRequest(req, res) {
       const body = await readBody(req);
       const { email } = JSON.parse(body);
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        sendJson(res, 400, { error: 'Email inválido.' });
+        sendJson(res, 400, { error: 'Email inválido.' }, corsOrigin);
         return;
       }
       const result = saveNewsletterEmail(email.trim().toLowerCase());
-      sendJson(res, 200, { ok: true, duplicate: result.duplicate });
+      sendJson(res, 200, { ok: true, duplicate: result.duplicate }, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {
-        sendJson(res, 413, { error: 'Payload muito grande.' });
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
         return;
       }
-      sendJson(res, 500, { error: 'Erro interno.' });
+      sendJson(res, 500, { error: 'Erro interno.' }, corsOrigin);
     }
     return;
   }
 
-  sendJson(res, 404, { error: 'Rota não encontrada' });
+  sendJson(res, 404, { error: 'Rota não encontrada' }, corsOrigin);
 }
 
 const server = http.createServer(handleRequest);
