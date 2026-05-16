@@ -5,6 +5,7 @@ const { getProductBySlug, listCategories, listProducts } = require('./db/product
 const { subscribeNewsletter } = require('./db/newsletter');
 const { addCartItem, deleteCartItem, listCartItems, updateCartItem } = require('./db/cart');
 const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wishlist');
+const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orders');
 const { getSessionId } = require('./db/session');
 
 const PORT = Number(process.env.PORT || 3001);
@@ -422,6 +423,64 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === '/api/orders' && req.method === 'POST') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, 'orders')) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
+    try {
+      const parsed = parseJsonBody(await readBody(req));
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error }, corsOrigin);
+        return;
+      }
+      const result = await createOrder(sessionId, parsed.value);
+      sendJson(res, 201, result, corsOrigin);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, err.statusCode || 500, { error: err.statusCode ? err.message : 'Erro ao criar pedido.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/orders' && req.method === 'GET') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    try {
+      sendJson(res, 200, await listOrders(sessionId), corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar pedidos.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/orders/') && req.method === 'GET') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const id = extractRouteId(url.pathname, '/api/orders/');
+    if (!id) {
+      sendJson(res, 400, { error: 'Pedido invalido.' }, corsOrigin);
+      return;
+    }
+    try {
+      const result = await getOrder(sessionId, id);
+      if (!result.order) {
+        sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, 200, result, corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar pedido.' }, corsOrigin);
+    }
+    return;
+  }
+
   if (url.pathname === '/api/coupon/validate' && req.method === 'POST') {
     const clientIp = getClientIp(req);
     if (!checkRateLimit(clientIp, 'coupon')) {
@@ -442,13 +501,30 @@ async function handleRequest(req, res) {
         sendJson(res, 400, { valid: false, error: 'Código inválido.' }, corsOrigin);
         return;
       }
-      const key = `COUPON_${code.trim().toUpperCase()}`;
+      const normalizedCode = code.trim().toUpperCase();
+
+      // Prisma-first: mesma fonte usada pelo createOrder
+      const prismaResult = await validateCoupon(normalizedCode);
+      if (prismaResult.prismaAvailable) {
+        if (!prismaResult.valid) {
+          sendJson(res, 200, { valid: false }, corsOrigin);
+          return;
+        }
+        const response = prismaResult.discountType === 'PERCENT'
+          ? { valid: true, code: prismaResult.code, discountPercent: prismaResult.discountValue }
+          : { valid: true, code: prismaResult.code, discountFixed: prismaResult.discountValue / 100 };
+        sendJson(res, 200, response, corsOrigin);
+        return;
+      }
+
+      // Fallback: .env (Prisma indisponível — modo demo)
+      const key = `COUPON_${normalizedCode}`;
       const discountPercent = Number(appConfig[key]);
       if (!discountPercent || Number.isNaN(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
         sendJson(res, 200, { valid: false }, corsOrigin);
         return;
       }
-      sendJson(res, 200, { valid: true, code: code.trim().toUpperCase(), discountPercent }, corsOrigin);
+      sendJson(res, 200, { valid: true, code: normalizedCode, discountPercent }, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {
         sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
