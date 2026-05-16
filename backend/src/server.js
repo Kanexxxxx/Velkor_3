@@ -26,6 +26,29 @@ const appConfig = {
   ...process.env
 };
 
+// Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = 5;
+const rateLimitStore = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.socket.remoteAddress ?? '0.0.0.0';
+}
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitStore.set(ip, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count += 1;
+  return true;
+}
+
 // Origins permitidas — nunca usa wildcard '*'
 const ALLOWED_ORIGINS = appConfig.ALLOWED_ORIGINS
   ? appConfig.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
@@ -162,6 +185,11 @@ async function handleRequest(req, res) {
   }
 
   if (url.pathname === '/api/newsletter' && req.method === 'POST') {
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp)) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
     try {
       const body = await readBody(req);
       const { email } = JSON.parse(body);
