@@ -37,11 +37,22 @@ function getClientIp(req) {
   return req.socket.remoteAddress ?? '0.0.0.0';
 }
 
-function checkRateLimit(ip) {
+function cleanupRateLimitStore(now) {
+  if (rateLimitStore.size < 1000) return;
+  for (const [key, entry] of rateLimitStore) {
+    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+      rateLimitStore.delete(key);
+    }
+  }
+}
+
+function checkRateLimit(ip, scope) {
   const now = Date.now();
-  const entry = rateLimitStore.get(ip);
+  cleanupRateLimitStore(now);
+  const key = `${scope}:${ip}`;
+  const entry = rateLimitStore.get(key);
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    rateLimitStore.set(ip, { count: 1, windowStart: now });
+    rateLimitStore.set(key, { count: 1, windowStart: now });
     return true;
   }
   if (entry.count >= RATE_LIMIT_MAX) return false;
@@ -70,6 +81,9 @@ function sendJson(res, statusCode, payload, corsOrigin) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'X-Frame-Options': 'DENY',
     ...corsHeaders
   });
   res.end(body);
@@ -139,6 +153,12 @@ function readBody(req, maxBytes = 64 * 1024) {
 async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const corsOrigin = resolveAllowedOrigin(req);
+  const requestOrigin = req.headers.origin;
+
+  if (requestOrigin && !corsOrigin) {
+    sendJson(res, 403, { error: 'Origem não permitida.' }, null);
+    return;
+  }
 
   if (req.method === 'OPTIONS') {
     if (corsOrigin) {
@@ -173,13 +193,20 @@ async function handleRequest(req, res) {
 
   if (url.pathname === '/api/coupon/validate' && req.method === 'POST') {
     const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp)) {
+    if (!checkRateLimit(clientIp, 'coupon')) {
       sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
       return;
     }
     try {
       const body = await readBody(req);
-      const { code } = JSON.parse(body);
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        sendJson(res, 400, { valid: false, error: 'JSON inválido.' }, corsOrigin);
+        return;
+      }
+      const { code } = parsed;
       if (!code || typeof code !== 'string') {
         sendJson(res, 400, { valid: false, error: 'Código inválido.' }, corsOrigin);
         return;
@@ -202,6 +229,11 @@ async function handleRequest(req, res) {
   }
 
   if (url.pathname === '/api/admin/unlock' && req.method === 'POST') {
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, 'admin')) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
     const adminSecret = appConfig.ADMIN_SECRET;
     if (!adminSecret) {
       sendJson(res, 503, { error: 'Painel admin não configurado no servidor. Defina ADMIN_SECRET no .env.' }, corsOrigin);
@@ -209,7 +241,14 @@ async function handleRequest(req, res) {
     }
     try {
       const body = await readBody(req);
-      const { password } = JSON.parse(body);
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        sendJson(res, 400, { error: 'JSON inválido.' }, corsOrigin);
+        return;
+      }
+      const { password } = parsed;
       if (typeof password !== 'string' || password !== adminSecret) {
         sendJson(res, 401, { error: 'Senha incorreta.' }, corsOrigin);
         return;
@@ -227,13 +266,20 @@ async function handleRequest(req, res) {
 
   if (url.pathname === '/api/newsletter' && req.method === 'POST') {
     const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp)) {
+    if (!checkRateLimit(clientIp, 'newsletter')) {
       sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
       return;
     }
     try {
       const body = await readBody(req);
-      const { email } = JSON.parse(body);
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        sendJson(res, 400, { error: 'JSON inválido.' }, corsOrigin);
+        return;
+      }
+      const { email } = parsed;
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         sendJson(res, 400, { error: 'Email inválido.' }, corsOrigin);
         return;

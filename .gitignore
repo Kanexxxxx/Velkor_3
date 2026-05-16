@@ -13,6 +13,7 @@ out/
 *.log
 *.tsbuildinfo
 .cache/
+backend/data/
 
 # Environment
 .env
