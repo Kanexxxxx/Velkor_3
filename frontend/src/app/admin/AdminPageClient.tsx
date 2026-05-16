@@ -7,13 +7,14 @@ import { formatPrice, products } from '@/services/products';
 import { readOrders } from '@/services/orders';
 import type { Order } from '@/types/order';
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export function AdminPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [unlocked, setUnlocked] = useState(false);
   const [attempt, setAttempt] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (unlocked) setOrders(readOrders());
@@ -33,18 +34,27 @@ export function AdminPageClient() {
   }, {});
 
   if (!unlocked) {
-    function handleUnlock(event: FormEvent<HTMLFormElement>) {
+    async function handleUnlock(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
-      if (!ADMIN_PASSWORD) {
-        setError('NEXT_PUBLIC_ADMIN_PASSWORD não configurada. Defina a variável de ambiente para ativar o painel.');
-        return;
-      }
-      if (attempt === ADMIN_PASSWORD) {
-        setUnlocked(true);
-        setError('');
-      } else {
-        setError('Senha incorreta.');
-        setAttempt('');
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetch(`${API_URL}/api/admin/unlock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: attempt })
+        });
+        if (res.ok) {
+          setUnlocked(true);
+        } else {
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          setError(data.error ?? 'Senha incorreta.');
+          setAttempt('');
+        }
+      } catch {
+        setError('Não foi possível conectar ao servidor. Verifique se o backend está ativo em ' + API_URL);
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -68,8 +78,8 @@ export function AdminPageClient() {
                 />
               </div>
               {error ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p> : null}
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                Entrar
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
+                {loading ? 'Verificando...' : 'Entrar'}
               </button>
             </form>
           </div>

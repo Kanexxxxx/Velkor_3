@@ -94,6 +94,26 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === '/api/admin/unlock' && req.method === 'POST') {
+    const adminSecret = appConfig.ADMIN_SECRET;
+    if (!adminSecret) {
+      sendJson(res, 503, { error: 'Painel admin não configurado no servidor. Defina ADMIN_SECRET no .env.' });
+      return;
+    }
+    try {
+      const body = await readBody(req);
+      const { password } = JSON.parse(body);
+      if (typeof password !== 'string' || password !== adminSecret) {
+        sendJson(res, 401, { error: 'Senha incorreta.' });
+        return;
+      }
+      sendJson(res, 200, { ok: true });
+    } catch {
+      sendJson(res, 500, { error: 'Erro interno.' });
+    }
+    return;
+  }
+
   if (url.pathname === '/api/newsletter' && req.method === 'POST') {
     try {
       const body = await readBody(req);
