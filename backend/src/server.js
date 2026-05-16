@@ -160,6 +160,36 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === '/api/coupon/validate' && req.method === 'POST') {
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp)) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
+    try {
+      const body = await readBody(req);
+      const { code } = JSON.parse(body);
+      if (!code || typeof code !== 'string') {
+        sendJson(res, 400, { valid: false, error: 'Código inválido.' }, corsOrigin);
+        return;
+      }
+      const key = `COUPON_${code.trim().toUpperCase()}`;
+      const discountPercent = Number(appConfig[key]);
+      if (!discountPercent || Number.isNaN(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
+        sendJson(res, 200, { valid: false }, corsOrigin);
+        return;
+      }
+      sendJson(res, 200, { valid: true, code: code.trim().toUpperCase(), discountPercent }, corsOrigin);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, 500, { error: 'Erro interno.' }, corsOrigin);
+    }
+    return;
+  }
+
   if (url.pathname === '/api/admin/unlock' && req.method === 'POST') {
     const adminSecret = appConfig.ADMIN_SECRET;
     if (!adminSecret) {
