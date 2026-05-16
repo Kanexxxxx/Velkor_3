@@ -56,11 +56,34 @@ function saveNewsletterEmail(email) {
   return { duplicate: false };
 }
 
-function readBody(req) {
+class PayloadTooLargeError extends Error {
+  constructor() {
+    super('Payload too large');
+    this.name = 'PayloadTooLargeError';
+  }
+}
+
+function readBody(req, maxBytes = 64 * 1024) {
   return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => resolve(body));
+    const chunks = [];
+    let size = 0;
+    let tooLarge = false;
+
+    req.on('data', chunk => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        tooLarge = true;
+        req.resume(); // drena o stream sem armazenar
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    req.on('end', () => {
+      if (tooLarge) reject(new PayloadTooLargeError());
+      else resolve(Buffer.concat(chunks).toString('utf8'));
+    });
+
     req.on('error', reject);
   });
 }
@@ -108,7 +131,11 @@ async function handleRequest(req, res) {
         return;
       }
       sendJson(res, 200, { ok: true });
-    } catch {
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' });
+        return;
+      }
       sendJson(res, 500, { error: 'Erro interno.' });
     }
     return;
@@ -124,7 +151,11 @@ async function handleRequest(req, res) {
       }
       const result = saveNewsletterEmail(email.trim().toLowerCase());
       sendJson(res, 200, { ok: true, duplicate: result.duplicate });
-    } catch {
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' });
+        return;
+      }
       sendJson(res, 500, { error: 'Erro interno.' });
     }
     return;
