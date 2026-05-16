@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { useCart } from '@/components/cart/CartProvider';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -79,12 +79,26 @@ function isActive(pathname: string | null, currentSearch: string, href: string) 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [siteSearch, setSiteSearch] = useState('');
+  const [hasHydrated, setHasHydrated] = useState(false);
   const { summary } = useCart();
   const { productIds: wishlistIds } = useWishlist();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isReady, logout } = useAuth();
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentSearch = searchParams.toString();
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const term = siteSearch.trim();
+    router.push(term ? `/shop?q=${encodeURIComponent(term)}` : '/shop');
+    setIsMenuOpen(false);
+  }
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = isMenuOpen || isCartOpen ? 'hidden' : '';
@@ -140,13 +154,22 @@ export function Navbar() {
           </nav>
 
           <div className="nav-actions">
-            <div className="search-wrap">
-              <SearchIcon />
+            <form className="search-wrap" role="search" onSubmit={submitSearch}>
+              <button className="search-submit" type="submit" aria-label="Pesquisar no acervo">
+                <SearchIcon />
+              </button>
               <label className="sr-only" htmlFor="siteSearch">Buscar no acervo</label>
-              <input id="siteSearch" className="search-input" type="search" placeholder="Buscar no acervo" />
-            </div>
+              <input
+                id="siteSearch"
+                className="search-input"
+                type="search"
+                placeholder="Buscar no acervo"
+                value={siteSearch}
+                onChange={event => setSiteSearch(event.target.value)}
+              />
+            </form>
 
-            {isAuthenticated ? (
+            {hasHydrated && isReady && isAuthenticated ? (
               <UserMenu />
             ) : (
               <Link className="icon-btn" href="/account" aria-label="Entrar ou criar conta">
@@ -186,7 +209,7 @@ export function Navbar() {
       </header>
 
       <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`.trim()} id="mobileMenu" aria-hidden={!isMenuOpen}>
-        {user ? (
+        {hasHydrated && isReady && user ? (
           <div className="mobile-account">
             <span className="mobile-avatar" aria-hidden="true">{user.name.slice(0, 1).toUpperCase()}</span>
             <div>
@@ -200,8 +223,20 @@ export function Navbar() {
           </Link>
         )}
 
-        <label className="sr-only" htmlFor="mobileSearch">Buscar no acervo</label>
-        <input id="mobileSearch" className="search-input" type="search" placeholder="Buscar no acervo" />
+        <form className="mobile-search-form" role="search" onSubmit={submitSearch}>
+          <label className="sr-only" htmlFor="mobileSearch">Buscar no acervo</label>
+          <button className="search-submit" type="submit" aria-label="Pesquisar no acervo">
+            <SearchIcon />
+          </button>
+          <input
+            id="mobileSearch"
+            className="search-input"
+            type="search"
+            placeholder="Buscar no acervo"
+            value={siteSearch}
+            onChange={event => setSiteSearch(event.target.value)}
+          />
+        </form>
 
         <ul>
           {navItems.map(item => {
@@ -221,7 +256,7 @@ export function Navbar() {
           })}
         </ul>
 
-        {user ? (
+        {hasHydrated && isReady && user ? (
           <div className="mobile-account-actions">
             <Link href="/account?tab=profile">Meu perfil</Link>
             <Link href="/account?tab=orders">Meus pedidos</Link>

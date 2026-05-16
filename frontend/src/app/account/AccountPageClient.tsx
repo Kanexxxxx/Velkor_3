@@ -169,7 +169,7 @@ function AuthLandingView({ onLogin, onRegister, onForgot }: AuthLandingProps) {
         </div>
 
         {forgotMode ? (
-          <section className="auth-grid auth-grid-single">
+          <section className="auth-grid auth-grid-single" key="forgot-password">
             <form
               className="form-block"
               onSubmit={event => {
@@ -202,7 +202,7 @@ function AuthLandingView({ onLogin, onRegister, onForgot }: AuthLandingProps) {
             </form>
           </section>
         ) : (
-          <section className="auth-grid">
+          <section className="auth-grid" key="login-register">
             <form className="form-block" onSubmit={handleLogin} noValidate>
               <h3><span className="num">01</span> Entrar</h3>
               <div className="sub">Acesse sua conta Velkor</div>

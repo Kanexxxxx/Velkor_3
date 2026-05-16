@@ -1,15 +1,17 @@
 import type { NextConfig } from 'next';
 
-// CSP: domínios explícitos — sem wildcard '*'
-// 'unsafe-inline' em script-src é necessário para hidratação do Next.js e
-// scripts de analytics (GA4/Meta Pixel). Migração para nonces é o próximo passo.
+const isDev = process.env.NODE_ENV !== 'production';
+
+// CSP: domínios explícitos — sem wildcard '*'.
+// Em desenvolvimento, o Next.js precisa de 'unsafe-eval' para compilar e
+// hidratar páginas. Em produção essa permissão não é enviada.
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net",
-  "style-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://connect.facebook.net`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https://images.unsplash.com https://www.facebook.com",
-  "font-src 'self'",
-  "connect-src 'self' https://viacep.com.br",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  `connect-src 'self' http://localhost:3001 http://127.0.0.1:3001 https://viacep.com.br${isDev ? ' ws://localhost:3000 ws://127.0.0.1:3000' : ''}`,
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",

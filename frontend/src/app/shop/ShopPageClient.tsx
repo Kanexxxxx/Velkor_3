@@ -75,13 +75,14 @@ export function ShopPageClient() {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('cat');
   const sortParam = searchParams.get('sort');
+  const queryParam = searchParams.get('q');
   const [selectedCategories, setSelectedCategories] = useState<Set<ProductCategory>>(() => getCategorySet(categoryParam));
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(() => new Set());
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [sort, setSort] = useState<SortValue>(() => getSort(sortParam));
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(queryParam ?? '');
 
   useEffect(() => {
     setSelectedCategories(getCategorySet(categoryParam));
@@ -90,6 +91,10 @@ export function ShopPageClient() {
   useEffect(() => {
     setSort(getSort(sortParam));
   }, [sortParam]);
+
+  useEffect(() => {
+    setSearch(queryParam ?? '');
+  }, [queryParam]);
 
   const activeCategory = selectedCategories.size === 1 ? Array.from(selectedCategories)[0] : null;
   const heroCopy = activeCategory ? categoryCopy[activeCategory] : null;
@@ -137,7 +142,7 @@ export function ShopPageClient() {
     setSelectedBrands(new Set());
     setSelectedSize(null);
     setSelectedColor(null);
-    setMaxPrice(600);
+    setMaxPrice(3000);
     setSearch('');
     setSort('popular');
   }
@@ -314,9 +319,7 @@ export function ShopPageClient() {
             )}
 
             <nav className="pagination" aria-label="Paginação da loja">
-              <button className="active" type="button" aria-current="page">1</button>
-              <button type="button" aria-label="Página 2">2</button>
-              <button type="button" aria-label="Próxima página">→</button>
+              <span className="active" aria-current="page">1</span>
             </nav>
           </section>
         </div>

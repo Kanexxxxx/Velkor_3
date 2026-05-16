@@ -61,9 +61,13 @@ function checkRateLimit(ip, scope) {
 }
 
 // Origins permitidas — nunca usa wildcard '*'
+const LOCAL_DEV_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001'];
 const ALLOWED_ORIGINS = appConfig.ALLOWED_ORIGINS
   ? appConfig.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
-  : ['http://localhost:3000', 'http://localhost:3001'];
+  : LOCAL_DEV_ORIGINS;
+for (const origin of LOCAL_DEV_ORIGINS) {
+  if (!ALLOWED_ORIGINS.includes(origin)) ALLOWED_ORIGINS.push(origin);
+}
 
 function resolveAllowedOrigin(req) {
   const origin = req.headers.origin;

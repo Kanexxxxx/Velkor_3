@@ -106,7 +106,7 @@ export function CheckoutPageClient() {
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const [appliedCouponPercent, setAppliedCouponPercent] = useState(0);
   const [couponLoading, setCouponLoading] = useState(false);
-  const [orderCode] = useState(createOrderCode);
+  const [orderCode, setOrderCode] = useState('');
   const [pending, setPending] = useState(false);
 
   const [contact, setContact] = useState({ name: '', email: '', phone: '' });
@@ -114,6 +114,10 @@ export function CheckoutPageClient() {
   const [addressForm, setAddressForm] = useState<AddressForm>(emptyAddress);
   const [saveAddress, setSaveAddress] = useState(true);
   const [cepLoading, setCepLoading] = useState(false);
+
+  useEffect(() => {
+    setOrderCode(createOrderCode());
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -182,6 +186,13 @@ export function CheckoutPageClient() {
     }
   }
 
+  function removeCoupon() {
+    setAppliedCoupon('');
+    setAppliedCouponPercent(0);
+    setCoupon('');
+    notify('Cupom removido.', 'info');
+  }
+
   async function lookupCep(raw: string) {
     const cep = raw.replace(/\D/g, '');
     if (cep.length !== 8) return;
@@ -224,6 +235,10 @@ export function CheckoutPageClient() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!orderCode) {
+      notify('Aguarde o checkout finalizar a preparação do pedido.', 'error');
+      return;
+    }
     if (!items.length) {
       notify('Sua sacola está vazia.', 'error');
       return;
@@ -300,7 +315,7 @@ export function CheckoutPageClient() {
         </div>
 
         <h1>Última <span className="red">Etapa.</span></h1>
-        <div className="checkout-sub">PEDIDO #{orderCode}{user ? ` · LOGADO COMO ${user.email.toUpperCase()}` : ''}</div>
+        <div className="checkout-sub">PEDIDO #{orderCode || 'GERANDO'}{user ? ` · LOGADO COMO ${user.email.toUpperCase()}` : ''}</div>
 
         <div className="checkout-grid">
           <form className="checkout-form" onSubmit={handleSubmit}>
@@ -527,7 +542,11 @@ export function CheckoutPageClient() {
 
             <div className="coupon-row">
               <input type="text" value={coupon} onChange={event => setCoupon(event.target.value)} placeholder="INSERIR CUPOM" disabled={couponLoading} />
-              <button type="button" onClick={applyCoupon} disabled={couponLoading}>{couponLoading ? '...' : 'Aplicar'}</button>
+              {appliedCoupon ? (
+                <button type="button" onClick={removeCoupon} disabled={couponLoading}>Remover</button>
+              ) : (
+                <button type="button" onClick={applyCoupon} disabled={couponLoading}>{couponLoading ? '...' : 'Aplicar'}</button>
+              )}
             </div>
 
             <div className="summary-totals">
