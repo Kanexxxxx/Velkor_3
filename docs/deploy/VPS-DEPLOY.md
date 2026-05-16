@@ -81,7 +81,9 @@ nano frontend/.env.local
 ```
 
 ```env
-NEXT_PUBLIC_API_URL=https://velkor.com.br/api
+# Atenção: SEM /api no final — o frontend já acrescenta /api em cada chamada
+# Ex.: fetch(`${NEXT_PUBLIC_API_URL}/api/health`) → https://velkor.com.br/api/health
+NEXT_PUBLIC_API_URL=https://velkor.com.br
 NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=<sua-chave-publica-mp>
 # Opcional — analytics
 NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
@@ -293,7 +295,7 @@ Antes de abrir para o público, confirmar que cada variável está configurada:
 - [ ] `VELKOR_SUPPORT_EMAIL=<email real>`
 
 ### Frontend `frontend/.env.local`
-- [ ] `NEXT_PUBLIC_API_URL=https://velkor.com.br/api`
+- [ ] `NEXT_PUBLIC_API_URL=https://velkor.com.br` (sem /api no final)
 - [ ] `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=<chave pública MP>`
 - [ ] Analytics IDs (opcional mas recomendado)
 
