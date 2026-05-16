@@ -89,7 +89,18 @@ function saveNewsletterEmail(email) {
   const emails = readNewsletterEmails();
   if (emails.some(entry => entry.email === email)) return { duplicate: true };
   emails.push({ email, subscribedAt: new Date().toISOString() });
-  fs.writeFileSync(NEWSLETTER_FILE, JSON.stringify(emails, null, 2), 'utf8');
+
+  const json = JSON.stringify(emails, null, 2);
+  const tmpFile = `${NEWSLETTER_FILE}.tmp`;
+
+  // Escrita atômica: grava em .tmp e depois renomeia atomicamente.
+  // Se o processo morrer durante a gravação, o arquivo original fica intacto.
+  fs.writeFileSync(tmpFile, json, 'utf8');
+  if (fs.existsSync(NEWSLETTER_FILE)) {
+    fs.copyFileSync(NEWSLETTER_FILE, `${NEWSLETTER_FILE}.bak`);
+  }
+  fs.renameSync(tmpFile, NEWSLETTER_FILE);
+
   return { duplicate: false };
 }
 
