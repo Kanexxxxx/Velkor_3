@@ -12,7 +12,7 @@
     "lint": "npm run lint --prefix frontend",
     "typecheck": "npm run typecheck --prefix frontend",
     "check:backend": "node --check backend/src/server.js",
-    "test": "npm run check:backend && npm run typecheck && npm run lint"
+    "test": "npm run test --prefix backend && npm run typecheck && npm run lint"
   },
   "engines": {
     "node": ">=20.0.0"

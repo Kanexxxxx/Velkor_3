@@ -1,4 +1,5 @@
 import type { Order } from '@/types/order';
+import { fetchRemoteOrders } from '@/services/orderApi';
 
 export const ORDERS_STORAGE_KEY = 'velkor_orders_v1';
 
@@ -28,6 +29,18 @@ export function addOrder(order: Order) {
 export function ordersForUser(userId: string | null | undefined): Order[] {
   if (!userId) return [];
   return readOrders().filter(order => order.userId === userId);
+}
+
+export async function loadOrdersForUser(userId: string | null | undefined): Promise<Order[]> {
+  const localOrders = ordersForUser(userId);
+  try {
+    const remoteOrders = await fetchRemoteOrders();
+    if (!userId) return remoteOrders.length ? remoteOrders : localOrders;
+    const merged = [...remoteOrders.filter(order => order.userId === userId || !order.userId), ...localOrders];
+    return Array.from(new Map(merged.map(order => [order.id, order])).values());
+  } catch {
+    return localOrders;
+  }
 }
 
 export const orderStatusLabels: Record<Order['status'], { label: string; tone: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' }> = {

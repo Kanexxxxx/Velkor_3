@@ -117,14 +117,19 @@ model WishlistItem {
 model Order {
   id             String      @id @default(uuid())
   userId         String?
+  sessionId      String?
   user           User?       @relation(fields: [userId], references: [id])
   email          String
+  contactName    String?
+  contactPhone   String?
   status         OrderStatus @default(PENDING)
   subtotalCents  Int
   discountCents  Int         @default(0)
   shippingCents  Int         @default(0)
   totalCents     Int
   couponCode     String?
+  paymentMethod  String?
+  shippingMethod String?
   shippingAddressId String?
   shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
   items          OrderItem[]
@@ -132,6 +137,7 @@ model Order {
   updatedAt      DateTime    @updatedAt
 
   @@index([userId])
+  @@index([sessionId])
   @@index([email])
   @@index([status])
 }
