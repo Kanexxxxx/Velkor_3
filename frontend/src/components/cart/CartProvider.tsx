@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { addRemoteCartItem, fetchRemoteCart, removeRemoteCartItem, syncRemoteCart, updateRemoteCartItem } from '@/services/cartApi';
 import { CART_STORAGE_KEY, calculateCartSummary } from '@/services/cart';
 import { products } from '@/services/products';
 import type { AddCartItemInput, CartItem, CartSummary } from '@/types/cart';
@@ -8,6 +9,9 @@ import type { AddCartItemInput, CartItem, CartSummary } from '@/types/cart';
 interface CartContextValue {
   items: CartItem[];
   summary: CartSummary;
+  isSyncing: boolean;
+  syncError: string;
+  retrySync: () => void;
   addItem: (item: AddCartItemInput) => void;
   updateQuantity: (item: CartItem, quantity: number) => void;
   removeItem: (item: CartItem) => void;
@@ -36,11 +40,40 @@ function readStoredCart(): CartItem[] {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isReady, setIsReady] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [syncAttempt, setSyncAttempt] = useState(0);
 
   useEffect(() => {
     setItems(readStoredCart());
     setIsReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+    let active = true;
+    setIsSyncing(true);
+    setSyncError('');
+
+    syncRemoteCart(items)
+      .then(remoteItems => {
+        if (!active) return;
+        if (remoteItems.length) setItems(remoteItems);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSyncError('Carrinho em modo demo. Tentaremos sincronizar novamente.');
+      })
+      .finally(() => {
+        if (active) setIsSyncing(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  // run only after hydration and explicit retries, not after every optimistic item change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, syncAttempt]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -67,10 +100,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       return [...current, { ...input, quantity }];
     });
+
+    addRemoteCartItem({ ...input, quantity }).catch(() => {
+      setSyncError('Carrinho salvo localmente. Nao foi possivel sincronizar agora.');
+    });
   }, []);
 
   const removeItem = useCallback((target: CartItem) => {
     setItems(current => current.filter(item => itemKey(item) !== itemKey(target)));
+    removeRemoteCartItem(target).catch(() => {
+      setSyncError('Remocao salva localmente. Nao foi possivel sincronizar agora.');
+    });
   }, []);
 
   const updateQuantity = useCallback((target: CartItem, quantity: number) => {
@@ -80,15 +120,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     setItems(current => current.map(item => itemKey(item) === itemKey(target) ? { ...item, quantity } : item));
+    updateRemoteCartItem(target, quantity).catch(() => {
+      setSyncError('Quantidade salva localmente. Nao foi possivel sincronizar agora.');
+    });
   }, [removeItem]);
 
   const clearCart = useCallback(() => {
     setItems([]);
+    fetchRemoteCart()
+      .then(remoteItems => Promise.all(remoteItems.map(item => removeRemoteCartItem(item))))
+      .catch(() => {
+        setSyncError('Carrinho limpo localmente. Nao foi possivel sincronizar agora.');
+      });
+  }, []);
+
+  const retrySync = useCallback(() => {
+    setSyncAttempt(current => current + 1);
   }, []);
 
   const value = useMemo<CartContextValue>(
-    () => ({ items, summary, addItem, updateQuantity, removeItem, clearCart }),
-    [addItem, clearCart, items, removeItem, summary, updateQuantity]
+    () => ({ items, summary, isSyncing, syncError, retrySync, addItem, updateQuantity, removeItem, clearCart }),
+    [addItem, clearCart, isSyncing, items, removeItem, retrySync, summary, syncError, updateQuantity]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
