@@ -1,0 +1,213 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING
+  PAID
+  FULFILLED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  name         String?
+  passwordHash String?
+  role         UserRole        @default(CUSTOMER)
+  demoUser     Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  addresses    Address[]
+  cartItems    CartItem[]
+  wishlistItems WishlistItem[]
+  orders       Order[]
+  auditLogs    AdminAuditLog[]
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id          String      @id
+  slug        String      @unique
+  name        String
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  brand       String
+  priceCents  Int
+  oldPriceCents Int?
+  rating      Float       @default(0)
+  reviews     Int         @default(0)
+  badge       String?
+  discount    Int?
+  colors      Json
+  image       String
+  images      Json?
+  sizes       Json
+  tag         String
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  cartItems   CartItem[]
+  wishlistItems WishlistItem[]
+  orderItems  OrderItem[]
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  userId    String?
+  sessionId String?
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+  quantity  Int      @default(1)
+  size      String?
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([productId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String?
+  sessionId String?
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, productId])
+  @@unique([userId, productId])
+  @@index([sessionId])
+  @@index([productId])
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id])
+  email          String
+  status         OrderStatus @default(PENDING)
+  subtotalCents  Int
+  discountCents  Int         @default(0)
+  shippingCents  Int         @default(0)
+  totalCents     Int
+  couponCode     String?
+  shippingAddressId String?
+  shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
+  items          OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  productId  String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+  name       String
+  unitPriceCents Int
+  quantity   Int
+  size       String?
+  color      String?
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  fullName     String
+  phone        String?
+  postalCode   String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String?
+  city         String
+  state        String
+  country      String   @default("BR")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+
+  @@index([userId])
+}
+
+model NewsletterSubscriber {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  source       String   @default("site")
+  isActive     Boolean  @default(true)
+  subscribedAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Coupon {
+  id              String       @id @default(uuid())
+  code            String       @unique
+  discountType    DiscountType @default(PERCENT)
+  discountValue   Int
+  active          Boolean      @default(true)
+  startsAt        DateTime?
+  expiresAt       DateTime?
+  maxRedemptions  Int?
+  redeemedCount   Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model AdminAuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entity, entityId])
+}

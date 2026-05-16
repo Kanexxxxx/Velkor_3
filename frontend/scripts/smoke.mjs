@@ -9,7 +9,7 @@ const checks = [
   { path: '/shop?sort=new', text: 'Todos os' },
   { path: '/product/v01', text: 'Estrato' },
   { path: '/wishlist', text: 'Favoritos' },
-  { path: '/account', text: 'Entrar' },
+  { path: '/account', text: 'Conta' },
   { path: '/checkout', text: 'Última' },
   { path: '/admin', text: 'Acesso' },
   { path: '/envio-e-devolucoes', text: 'Envio e Devoluções' },

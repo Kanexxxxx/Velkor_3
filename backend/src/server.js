@@ -1,6 +1,11 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { getProductBySlug, listCategories, listProducts } = require('./db/products');
+const { subscribeNewsletter } = require('./db/newsletter');
+const { addCartItem, deleteCartItem, listCartItems, updateCartItem } = require('./db/cart');
+const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wishlist');
+const { getSessionId } = require('./db/session');
 
 const PORT = Number(process.env.PORT || 3001);
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -25,6 +30,10 @@ const appConfig = {
   ...readEnvFile(ENV_PATH),
   ...process.env
 };
+
+for (const [key, value] of Object.entries(appConfig)) {
+  if (process.env[key] === undefined) process.env[key] = value;
+}
 
 // Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -91,6 +100,50 @@ function sendJson(res, statusCode, payload, corsOrigin) {
     ...corsHeaders
   });
   res.end(body);
+}
+
+function parseJsonBody(body) {
+  try {
+    return { value: JSON.parse(body) };
+  } catch {
+    return { error: 'JSON invalido.' };
+  }
+}
+
+function validateSession(req, res, corsOrigin) {
+  const sessionId = getSessionId(req);
+  if (!sessionId) {
+    sendJson(res, 400, { error: 'Sessao invalida.' }, corsOrigin);
+    return null;
+  }
+  return sessionId;
+}
+
+function validateCartPayload(payload) {
+  if (!payload || typeof payload !== 'object') return { error: 'Payload invalido.' };
+  const productId = typeof payload.productId === 'string' ? payload.productId.trim() : '';
+  const size = typeof payload.size === 'string' ? payload.size.trim() : '';
+  const color = typeof payload.color === 'string' ? payload.color.trim() : '';
+  const quantity = Number(payload.quantity ?? 1);
+
+  if (!productId || productId.length > 80) return { error: 'Produto invalido.' };
+  if (!size || size.length > 24) return { error: 'Tamanho invalido.' };
+  if (!color || color.length > 40) return { error: 'Cor invalida.' };
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return { error: 'Quantidade invalida.' };
+
+  return { value: { productId, size, color, quantity } };
+}
+
+function validateQuantityPayload(payload) {
+  if (!payload || typeof payload !== 'object') return { error: 'Payload invalido.' };
+  const quantity = Number(payload.quantity);
+  if (!Number.isInteger(quantity) || quantity < 0 || quantity > 99) return { error: 'Quantidade invalida.' };
+  return { value: quantity };
+}
+
+function extractRouteId(pathname, prefix) {
+  const value = decodeURIComponent(pathname.replace(prefix, '')).trim();
+  return value && value.length <= 120 ? value : null;
 }
 
 function readNewsletterEmails() {
@@ -195,6 +248,180 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === '/api/products' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, { products: await listProducts() }, corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar produtos.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/products/') && req.method === 'GET') {
+    const slug = decodeURIComponent(url.pathname.replace('/api/products/', '')).trim();
+    if (!slug) {
+      sendJson(res, 400, { error: 'Produto invalido.' }, corsOrigin);
+      return;
+    }
+    try {
+      const product = await getProductBySlug(slug);
+      if (!product) {
+        sendJson(res, 404, { error: 'Produto nao encontrado.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, 200, { product }, corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar produto.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/categories' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, { categories: await listCategories() }, corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar categorias.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/cart' && req.method === 'GET') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    try {
+      sendJson(res, 200, await listCartItems(sessionId), corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar carrinho.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/cart/items' && req.method === 'POST') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, 'cart')) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
+    try {
+      const parsed = parseJsonBody(await readBody(req));
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error }, corsOrigin);
+        return;
+      }
+      const payload = validateCartPayload(parsed.value);
+      if (payload.error) {
+        sendJson(res, 400, { error: payload.error }, corsOrigin);
+        return;
+      }
+      const result = await addCartItem(sessionId, payload.value);
+      sendJson(res, 200, result, corsOrigin);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, err.statusCode || 500, { error: err.statusCode ? err.message : 'Erro ao atualizar carrinho.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/cart/items/') && req.method === 'PATCH') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const id = extractRouteId(url.pathname, '/api/cart/items/');
+    if (!id) {
+      sendJson(res, 400, { error: 'Item invalido.' }, corsOrigin);
+      return;
+    }
+    try {
+      const parsed = parseJsonBody(await readBody(req));
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error }, corsOrigin);
+        return;
+      }
+      const payload = validateQuantityPayload(parsed.value);
+      if (payload.error) {
+        sendJson(res, 400, { error: payload.error }, corsOrigin);
+        return;
+      }
+      const result = await updateCartItem(sessionId, id, payload.value);
+      sendJson(res, 200, result, corsOrigin);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, err.statusCode || 500, { error: err.statusCode ? err.message : 'Erro ao atualizar item.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/cart/items/') && req.method === 'DELETE') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const id = extractRouteId(url.pathname, '/api/cart/items/');
+    if (!id) {
+      sendJson(res, 400, { error: 'Item invalido.' }, corsOrigin);
+      return;
+    }
+    try {
+      sendJson(res, 200, await deleteCartItem(sessionId, id), corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao remover item.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/wishlist' && req.method === 'GET') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    try {
+      sendJson(res, 200, await listWishlist(sessionId), corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao carregar favoritos.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/wishlist/') && req.method === 'POST') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, 'wishlist')) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
+    const productId = extractRouteId(url.pathname, '/api/wishlist/');
+    if (!productId) {
+      sendJson(res, 400, { error: 'Produto invalido.' }, corsOrigin);
+      return;
+    }
+    try {
+      sendJson(res, 200, await addWishlistItem(sessionId, productId), corsOrigin);
+    } catch (err) {
+      sendJson(res, err.statusCode || 500, { error: err.statusCode ? err.message : 'Erro ao atualizar favoritos.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/wishlist/') && req.method === 'DELETE') {
+    const sessionId = validateSession(req, res, corsOrigin);
+    if (!sessionId) return;
+    const productId = extractRouteId(url.pathname, '/api/wishlist/');
+    if (!productId) {
+      sendJson(res, 400, { error: 'Produto invalido.' }, corsOrigin);
+      return;
+    }
+    try {
+      sendJson(res, 200, await deleteWishlistItem(sessionId, productId), corsOrigin);
+    } catch {
+      sendJson(res, 500, { error: 'Erro ao remover favorito.' }, corsOrigin);
+    }
+    return;
+  }
+
   if (url.pathname === '/api/coupon/validate' && req.method === 'POST') {
     const clientIp = getClientIp(req);
     if (!checkRateLimit(clientIp, 'coupon')) {
@@ -288,7 +515,7 @@ async function handleRequest(req, res) {
         sendJson(res, 400, { error: 'Email inválido.' }, corsOrigin);
         return;
       }
-      const result = saveNewsletterEmail(email.trim().toLowerCase());
+      const result = await subscribeNewsletter(email, saveNewsletterEmail);
       sendJson(res, 200, { ok: true, duplicate: result.duplicate }, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {
