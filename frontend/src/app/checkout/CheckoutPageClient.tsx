@@ -10,7 +10,8 @@ import { useNotifications } from '@/components/notifications/NotificationProvide
 import { trackEvent } from '@/components/Analytics';
 import { isValidEmail } from '@/services/auth';
 import { addOrder } from '@/services/orders';
-import { calculateCouponDiscount, createOrderCode } from '@/services/checkout';
+import { createOrderCode } from '@/services/checkout';
+import { API_BASE_URL } from '@/services/api';
 import { formatPrice, getProductById } from '@/services/products';
 import type { Address } from '@/types/user';
 import type { Order, OrderPayment, OrderShipping } from '@/types/order';
@@ -103,7 +104,9 @@ export function CheckoutPageClient() {
   const [payment, setPayment] = useState<OrderPayment>('card');
   const [coupon, setCoupon] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState('');
-  const [orderCode] = useState(createOrderCode);
+  const [appliedCouponPercent, setAppliedCouponPercent] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [orderCode, setOrderCode] = useState('');
   const [pending, setPending] = useState(false);
 
   const [contact, setContact] = useState({ name: '', email: '', phone: '' });
@@ -111,6 +114,10 @@ export function CheckoutPageClient() {
   const [addressForm, setAddressForm] = useState<AddressForm>(emptyAddress);
   const [saveAddress, setSaveAddress] = useState(true);
   const [cepLoading, setCepLoading] = useState(false);
+
+  useEffect(() => {
+    setOrderCode(createOrderCode());
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -143,7 +150,7 @@ export function CheckoutPageClient() {
   }, [selectedAddressId, user]);
 
   const subtotal = summary.subtotal;
-  const discount = calculateCouponDiscount(subtotal, appliedCoupon);
+  const discount = appliedCouponPercent > 0 ? Math.round(subtotal * appliedCouponPercent / 100) : 0;
   const shippingPrice = shippingPrices[shipping];
   const total = Math.max(0, subtotal + shippingPrice - discount);
 
@@ -152,18 +159,38 @@ export function CheckoutPageClient() {
     [items]
   );
 
-  function applyCoupon() {
-    const value = coupon.trim().toUpperCase();
-    if (!value) return;
-
-    if (calculateCouponDiscount(subtotal, value) > 0) {
-      setAppliedCoupon(value);
-      notify('Cupom aplicado: 15% de desconto.', 'success');
-      return;
+  async function applyCoupon() {
+    const code = coupon.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/coupon/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json() as { valid: boolean; discountPercent?: number; code?: string };
+      if (data.valid && data.discountPercent) {
+        setAppliedCoupon(data.code ?? code);
+        setAppliedCouponPercent(data.discountPercent);
+        notify(`Cupom aplicado: ${data.discountPercent}% de desconto.`, 'success');
+      } else {
+        setAppliedCoupon('');
+        setAppliedCouponPercent(0);
+        notify('Cupom inválido ou expirado.', 'error');
+      }
+    } catch {
+      notify('Não foi possível validar o cupom. Tente novamente.', 'error');
+    } finally {
+      setCouponLoading(false);
     }
+  }
 
+  function removeCoupon() {
     setAppliedCoupon('');
-    notify('Cupom inválido.', 'error');
+    setAppliedCouponPercent(0);
+    setCoupon('');
+    notify('Cupom removido.', 'info');
   }
 
   async function lookupCep(raw: string) {
@@ -208,6 +235,10 @@ export function CheckoutPageClient() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!orderCode) {
+      notify('Aguarde o checkout finalizar a preparação do pedido.', 'error');
+      return;
+    }
     if (!items.length) {
       notify('Sua sacola está vazia.', 'error');
       return;
@@ -284,7 +315,7 @@ export function CheckoutPageClient() {
         </div>
 
         <h1>Última <span className="red">Etapa.</span></h1>
-        <div className="checkout-sub">PEDIDO #{orderCode}{user ? ` · LOGADO COMO ${user.email.toUpperCase()}` : ''}</div>
+        <div className="checkout-sub">PEDIDO #{orderCode || 'GERANDO'}{user ? ` · LOGADO COMO ${user.email.toUpperCase()}` : ''}</div>
 
         <div className="checkout-grid">
           <form className="checkout-form" onSubmit={handleSubmit}>
@@ -510,8 +541,12 @@ export function CheckoutPageClient() {
             </div>
 
             <div className="coupon-row">
-              <input type="text" value={coupon} onChange={event => setCoupon(event.target.value)} placeholder="INSERIR CUPOM" />
-              <button type="button" onClick={applyCoupon}>Aplicar</button>
+              <input type="text" value={coupon} onChange={event => setCoupon(event.target.value)} placeholder="INSERIR CUPOM" disabled={couponLoading} />
+              {appliedCoupon ? (
+                <button type="button" onClick={removeCoupon} disabled={couponLoading}>Remover</button>
+              ) : (
+                <button type="button" onClick={applyCoupon} disabled={couponLoading}>{couponLoading ? '...' : 'Aplicar'}</button>
+              )}
             </div>
 
             <div className="summary-totals">

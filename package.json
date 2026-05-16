@@ -1,0 +1,20 @@
+{
+  "name": "velkor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VELKOR — Streetwear e sneakers premium",
+  "scripts": {
+    "dev:backend": "node backend/src/server.js",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "start:backend": "node backend/src/server.js",
+    "start:frontend": "npm run start --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "typecheck": "npm run typecheck --prefix frontend",
+    "check:backend": "node --check backend/src/server.js",
+    "test": "npm run check:backend && npm run typecheck && npm run lint"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

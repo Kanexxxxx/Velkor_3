@@ -2,13 +2,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { trackEvent } from '@/components/Analytics';
 import { useCart } from '@/components/cart/CartProvider';
 import { ProductCard } from '@/components/product/ProductCard';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { getInfoHref } from '@/services/infoPages';
-import { categoryLabels, formatPrice, products } from '@/services/products';
+import { categoryLabels, formatPrice } from '@/services/products';
+import { useProductCatalog, useProductDetail } from '@/services/useProductCatalog';
 import type { Product } from '@/types/product';
 
 interface ProductDetailClientProps {
@@ -66,10 +67,30 @@ function HeartIcon() {
   );
 }
 
-export function ProductDetailClient({ product }: ProductDetailClientProps) {
+function CatalogStatus({ status, error, onRetry }: { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; onRetry: () => void }) {
+  if (status === 'loading') {
+    return <p className="catalog-status" aria-live="polite">Atualizando produto...</p>;
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="catalog-status error" role="status">
+        <span>{error}</span>
+        <button type="button" onClick={onRetry}>Tentar novamente</button>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+export function ProductDetailClient({ product: initialProduct }: ProductDetailClientProps) {
   const { addItem } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
-  const images = product.images?.length ? product.images : [product.image];
+  const detailState = useProductDetail(initialProduct);
+  const catalog = useProductCatalog();
+  const product = detailState.product;
+  const images = useMemo(() => (product.images?.length ? product.images : [product.image]), [product.image, product.images]);
   const [activeImage, setActiveImage] = useState(images[0]);
   const [selectedColor, setSelectedColor] = useState(product.colors[0]);
   const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
@@ -77,9 +98,15 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const [activeTab, setActiveTab] = useState<TabId>('desc');
   const saved = isWishlisted(product.id);
 
+  useEffect(() => {
+    setActiveImage(images[0]);
+    setSelectedColor(product.colors[0]);
+    setSelectedSize(product.sizes[0]);
+  }, [images, product.colors, product.sizes]);
+
   const relatedProducts = useMemo(
-    () => products.filter(item => item.category === product.category && item.id !== product.id).slice(0, 4),
-    [product.category, product.id]
+    () => catalog.products.filter(item => item.category === product.category && item.id !== product.id).slice(0, 4),
+    [catalog.products, product.category, product.id]
   );
 
   const discount = product.discount ?? (
@@ -140,6 +167,8 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
           </div>
 
           <div className="pdp-info">
+            <CatalogStatus status={detailState.status} error={detailState.error || catalog.error} onRetry={detailState.retry} />
+
             <div className="crumbs">
               <Link href="/">Início</Link>
               <span className="sep">/</span>

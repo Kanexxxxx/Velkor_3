@@ -57,22 +57,36 @@ function generateSalt() {
   return Math.random().toString(36).slice(2);
 }
 
-async function digest(value: string) {
+// PBKDF2-SHA256 com 100 000 iterações — resistente a brute-force em GPU.
+// Requer Web Crypto API (disponível em todos os browsers modernos e Node 15+).
+// O fallback não-criptográfico nunca é atingido em produção; existe apenas
+// para ambientes de teste sem SubtleCrypto (ex.: jsdom antigo).
+export async function hashPassword(password: string, salt: string): Promise<string> {
   if (typeof crypto !== 'undefined' && crypto.subtle) {
-    const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-    return Array.from(new Uint8Array(buffer), byte => byte.toString(16).padStart(2, '0')).join('');
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations: 100_000 },
+      keyMaterial,
+      256
+    );
+    return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  // Fallback não-criptográfico (nunca usado em browser moderno)
   let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
+  const input = `${salt}::${password}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash).toString(16);
-}
-
-export async function hashPassword(password: string, salt: string) {
-  return digest(`${salt}::${password}`);
 }
 
 export async function verifyPassword(password: string, salt: string, expectedHash: string) {

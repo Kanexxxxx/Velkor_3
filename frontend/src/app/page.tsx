@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { trackEvent } from '@/components/Analytics';
 import { ProductCard } from '@/components/product/ProductCard';
-import { products } from '@/services/products';
+import { useProductCatalog } from '@/services/useProductCatalog';
 import type { Product } from '@/types/product';
 
 function ArrowIcon({ size = 14 }: { size?: number }) {
@@ -23,10 +23,6 @@ function StarIcon() {
     </svg>
   );
 }
-
-const trendingProducts = products.filter(product => product.tag === 'trending' || product.tag === 'best').slice(0, 4);
-const newProducts = products.filter(product => product.tag === 'new' || product.badge === 'NEW').slice(0, 4);
-const bestProducts = products.filter(product => product.tag === 'best').slice(0, 3);
 
 const marqueeText = (
   <>
@@ -89,6 +85,11 @@ const testimonials = [
 ];
 
 export default function HomePage() {
+  const catalog = useProductCatalog();
+  const trendingProducts = catalog.products.filter(product => product.tag === 'trending' || product.tag === 'best').slice(0, 4);
+  const newProducts = catalog.products.filter(product => product.tag === 'new' || product.badge === 'NEW').slice(0, 4);
+  const bestProducts = catalog.products.filter(product => product.tag === 'best').slice(0, 3);
+
   return (
     <>
       <section className="hero">
@@ -186,6 +187,9 @@ export default function HomePage() {
         href="/shop?sort=popular"
         linkLabel="Ver tendências"
         products={trendingProducts}
+        status={catalog.status}
+        error={catalog.error}
+        onRetry={catalog.retry}
       />
 
       <section className="section">
@@ -337,9 +341,12 @@ interface ProductSectionProps {
   linkLabel: string;
   products: Product[];
   gridClassName?: string;
+  status?: 'idle' | 'loading' | 'ready' | 'error';
+  error?: string;
+  onRetry?: () => void;
 }
 
-function ProductSection({ number, title, href, linkLabel, products: sectionProducts, gridClassName = 'product-grid reveal in' }: ProductSectionProps) {
+function ProductSection({ number, title, href, linkLabel, products: sectionProducts, gridClassName = 'product-grid reveal in', status = 'ready', error = '', onRetry }: ProductSectionProps) {
   return (
     <section className="section" style={{ paddingTop: number.startsWith('02') ? 40 : undefined }}>
       <div className="container">
@@ -354,10 +361,29 @@ function ProductSection({ number, title, href, linkLabel, products: sectionProdu
           </Link>
         </div>
 
+        <CatalogStatus status={status} error={error} onRetry={onRetry} />
+
         <div className={gridClassName}>
           {sectionProducts.map(product => <ProductCard product={product} key={product.id} />)}
         </div>
       </div>
     </section>
   );
+}
+
+function CatalogStatus({ status, error, onRetry }: { status: ProductSectionProps['status']; error: string; onRetry?: () => void }) {
+  if (status === 'loading') {
+    return <p className="catalog-status" aria-live="polite">Atualizando catálogo...</p>;
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="catalog-status error" role="status">
+        <span>{error}</span>
+        {onRetry ? <button type="button" onClick={onRetry}>Tentar novamente</button> : null}
+      </div>
+    );
+  }
+
+  return null;
 }

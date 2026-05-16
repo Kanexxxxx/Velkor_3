@@ -13,6 +13,7 @@ out/
 *.log
 *.tsbuildinfo
 .cache/
+backend/data/
 
 # Environment
 .env
@@ -20,3 +21,8 @@ out/
 !.env.example
 !frontend/.env.example
 !backend/.env.example
+
+# Claude Code — ferramentas de desenvolvimento local, não pertencem ao repo
+.agents/
+skills-lock.json
+.claude/settings.local.json

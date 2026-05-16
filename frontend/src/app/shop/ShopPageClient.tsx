@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProductCard } from '@/components/product/ProductCard';
-import { categoryLabels, formatPrice, products } from '@/services/products';
+import { categoryLabels, formatPrice } from '@/services/products';
+import { useProductCatalog } from '@/services/useProductCatalog';
 import type { Product, ProductCategory } from '@/types/product';
 
 type SortValue = 'popular' | 'new' | 'price-asc' | 'price-desc' | 'rating';
@@ -12,7 +13,6 @@ type SortValue = 'popular' | 'new' | 'price-asc' | 'price-desc' | 'rating';
 const categories: ProductCategory[] = ['sneakers', 'apparel', 'accessories'];
 const sizes = ['XS', 'S', 'M', 'L', 'XL', '39', '40', '41', '42', '43', '44'];
 const colors = ['#0a0a0a', '#ff1a3d', '#f5f1ea', '#6a6a6a', '#2a2a2a'];
-const brands = Array.from(new Set(products.map(product => product.brand))).sort();
 
 const categoryCopy: Record<ProductCategory, { title: string; red: string; eyebrow: string }> = {
   sneakers: {
@@ -40,14 +40,6 @@ function isSortValue(value: string | null): value is SortValue {
   return value === 'popular' || value === 'new' || value === 'price-asc' || value === 'price-desc' || value === 'rating';
 }
 
-function countByCategory(category: ProductCategory) {
-  return products.filter(product => product.category === category).length;
-}
-
-function countByBrand(brand: string) {
-  return products.filter(product => product.brand === brand).length;
-}
-
 function getCategorySet(categoryParam: string | null) {
   return new Set<ProductCategory>(isCategory(categoryParam) ? [categoryParam] : []);
 }
@@ -71,17 +63,42 @@ function sortProducts(items: Product[], sort: SortValue) {
   });
 }
 
+function CatalogStatus({ status, error, onRetry }: { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; onRetry: () => void }) {
+  if (status === 'loading') {
+    return <p className="catalog-status" aria-live="polite">Atualizando catálogo...</p>;
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="catalog-status error" role="status">
+        <span>{error}</span>
+        <button type="button" onClick={onRetry}>Tentar novamente</button>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function ShopPageClient() {
+  const catalog = useProductCatalog();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('cat');
   const sortParam = searchParams.get('sort');
+  const queryParam = searchParams.get('q');
   const [selectedCategories, setSelectedCategories] = useState<Set<ProductCategory>>(() => getCategorySet(categoryParam));
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(() => new Set());
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [sort, setSort] = useState<SortValue>(() => getSort(sortParam));
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(queryParam ?? '');
+  const productList = catalog.products;
+  const availableCategories = catalog.categories.map(category => category.slug).filter(isCategory);
+  const visibleCategories = availableCategories.length ? availableCategories : categories;
+  const brands = useMemo(() => Array.from(new Set(productList.map(product => product.brand))).sort(), [productList]);
+  const countByCategory = useCallback((category: ProductCategory) => productList.filter(product => product.category === category).length, [productList]);
+  const countByBrand = useCallback((brand: string) => productList.filter(product => product.brand === brand).length, [productList]);
 
   useEffect(() => {
     setSelectedCategories(getCategorySet(categoryParam));
@@ -91,12 +108,16 @@ export function ShopPageClient() {
     setSort(getSort(sortParam));
   }, [sortParam]);
 
+  useEffect(() => {
+    setSearch(queryParam ?? '');
+  }, [queryParam]);
+
   const activeCategory = selectedCategories.size === 1 ? Array.from(selectedCategories)[0] : null;
   const heroCopy = activeCategory ? categoryCopy[activeCategory] : null;
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    const filtered = products.filter(product => {
+    const filtered = productList.filter(product => {
       const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(product.category);
       const matchesBrand = selectedBrands.size === 0 || selectedBrands.has(product.brand);
       const matchesSize = !selectedSize || product.sizes.includes(selectedSize);
@@ -112,7 +133,7 @@ export function ShopPageClient() {
     });
 
     return sortProducts(filtered, sort);
-  }, [maxPrice, search, selectedBrands, selectedCategories, selectedColor, selectedSize, sort]);
+  }, [maxPrice, productList, search, selectedBrands, selectedCategories, selectedColor, selectedSize, sort]);
 
   function toggleCategory(category: ProductCategory) {
     setSelectedCategories(current => {
@@ -137,7 +158,7 @@ export function ShopPageClient() {
     setSelectedBrands(new Set());
     setSelectedSize(null);
     setSelectedColor(null);
-    setMaxPrice(600);
+    setMaxPrice(3000);
     setSearch('');
     setSort('popular');
   }
@@ -188,7 +209,7 @@ export function ShopPageClient() {
             <div className="filter-group">
               <h4>Categorias</h4>
               <div className="filter-list">
-                {categories.map(category => (
+                {visibleCategories.map(category => (
                   <label key={category}>
                     <input
                       type="checkbox"
@@ -281,6 +302,8 @@ export function ShopPageClient() {
           </aside>
 
           <section className="shop-main" aria-live="polite">
+            <CatalogStatus status={catalog.status} error={catalog.error} onRetry={catalog.retry} />
+
             <div className="shop-toolbar">
               <div className="count">
                 {filteredProducts.length} {filteredProducts.length === 1 ? 'produto' : 'produtos'} encontrados
@@ -314,9 +337,7 @@ export function ShopPageClient() {
             )}
 
             <nav className="pagination" aria-label="Paginação da loja">
-              <button className="active" type="button" aria-current="page">1</button>
-              <button type="button" aria-label="Página 2">2</button>
-              <button type="button" aria-label="Próxima página">→</button>
+              <span className="active" aria-current="page">1</span>
             </nav>
           </section>
         </div>

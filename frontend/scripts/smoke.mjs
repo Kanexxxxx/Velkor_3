@@ -11,7 +11,7 @@ const checks = [
   { path: '/wishlist', text: 'Favoritos' },
   { path: '/account', text: 'Entrar' },
   { path: '/checkout', text: 'Última' },
-  { path: '/admin', text: 'Controle' },
+  { path: '/admin', text: 'Acesso' },
   { path: '/envio-e-devolucoes', text: 'Envio e Devoluções' },
   { path: '/guia-de-tamanhos', text: 'Guia de Tamanhos' },
   { path: '/rastrear-pedido', text: 'Rastrear Pedido' },

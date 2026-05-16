@@ -56,8 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    setUser(loadCurrentUser());
-    setIsReady(true);
+    try {
+      setUser(loadCurrentUser());
+    } catch {
+      clearSession();
+      setUser(null);
+    } finally {
+      setIsReady(true);
+    }
   }, []);
 
   useEffect(() => {
