@@ -10,8 +10,32 @@ export interface AdminUser {
   role: AdminRole;
   emailVerified: boolean;
   demoUser: boolean;
+  addresses: AdminAddress[];
+  orders: AdminOrderSummary[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminAddress {
+  id: string;
+  recipient: string;
+  street: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrderSummary {
+  id: string;
+  status: Order['status'];
+  total: number;
+  createdAt: string;
 }
 
 export interface AdminCoupon {
@@ -34,6 +58,46 @@ export interface NewsletterSubscriber {
   source: string;
   isActive: boolean;
   subscribedAt: string;
+  updatedAt: string;
+}
+
+export interface AdminSettings {
+  store: {
+    appName: string;
+    publicUrl: string;
+    supportEmail: string;
+    whatsapp: string;
+    instagram: string;
+    allowedOrigins: string[];
+    legacyAdminUnlockEnabled: boolean;
+  };
+  integrations: {
+    mercadoPago: { configured: boolean; devMode: boolean; webhookConfigured: boolean };
+    email: { configured: boolean; devMode: boolean; user: string };
+    melhorEnvio: { configured: boolean; env: string; originCepConfigured: boolean };
+  };
+}
+
+export interface AdminProduct {
+  id: string;
+  slug: string;
+  name: string;
+  category: 'sneakers' | 'apparel' | 'accessories' | string;
+  categoryId?: string;
+  brand: string;
+  price: number;
+  oldPrice: number | null;
+  rating: number;
+  reviews: number;
+  badge: string | null;
+  discount: number | null;
+  colors: string[];
+  image: string;
+  images: string[];
+  sizes: string[];
+  tag: string;
+  active: boolean;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -83,6 +147,32 @@ export async function fetchAdminOrders() {
   return data.orders ?? [];
 }
 
+export async function fetchAdminProducts() {
+  const data = await request<{ products: AdminProduct[]; storage?: string }>('/api/admin/products');
+  return data.products ?? [];
+}
+
+export async function fetchAdminSettings() {
+  const data = await request<{ settings: AdminSettings }>('/api/admin/settings');
+  return data.settings;
+}
+
+export async function createAdminProduct(payload: Partial<AdminProduct>) {
+  const data = await request<{ product: AdminProduct }>('/api/admin/products', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data.product;
+}
+
+export async function updateAdminProduct(id: string, payload: Partial<AdminProduct>) {
+  const data = await request<{ product: AdminProduct }>(`/api/admin/products/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return data.product;
+}
+
 export async function updateAdminOrderStatus(id: string, status: Order['status']) {
   const data = await request<{ order: Order }>(`/api/admin/orders/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
@@ -96,7 +186,7 @@ export async function fetchAdminUsers() {
   return data.users ?? [];
 }
 
-export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser, 'role' | 'emailVerified'>>) {
+export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser, 'name' | 'email' | 'role' | 'emailVerified'>>) {
   const data = await request<{ user: AdminUser }>(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),

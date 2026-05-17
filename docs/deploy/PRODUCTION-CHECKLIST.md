@@ -16,8 +16,8 @@ Use este checklist antes de abrir trafego real.
 - [ ] `PORT=3001`.
 - [ ] `DATABASE_URL` aponta para PostgreSQL real.
 - [ ] `SESSION_SECRET` gerado com 64 bytes aleatorios.
-- [ ] `ALLOWED_ORIGINS=https://velkor.com.br,https://www.velkor.com.br`.
-- [ ] `VELKOR_PUBLIC_URL=https://velkor.com.br`.
+- [ ] `ALLOWED_ORIGINS=https://volkerr.com.br,https://www.volkerr.com.br`.
+- [ ] `VELKOR_PUBLIC_URL=https://volkerr.com.br`.
 - [ ] `ADMIN_EMAIL` configurado para o primeiro admin.
 - [ ] `ADMIN_PASSWORD` temporaria forte configurada apenas para seed inicial.
 - [ ] `LEGACY_ADMIN_UNLOCK_ENABLED=false`.
@@ -29,8 +29,8 @@ Use este checklist antes de abrir trafego real.
 
 ## Frontend env
 
-- [ ] `NEXT_PUBLIC_API_URL=https://velkor.com.br`.
-- [ ] `NEXT_PUBLIC_BRAND_SITE_URL=https://velkor.com.br`.
+- [ ] `NEXT_PUBLIC_API_URL=https://volkerr.com.br`.
+- [ ] `NEXT_PUBLIC_BRAND_SITE_URL=https://volkerr.com.br`.
 - [ ] `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY` configurado.
 - [ ] Analytics configurado somente se a conta real ja estiver pronta.
 - [ ] Nenhum segredo sem prefixo `NEXT_PUBLIC_` no frontend.
@@ -66,11 +66,11 @@ Use este checklist antes de abrir trafego real.
 
 ## Smoke tecnico
 
-- [ ] `curl -i https://velkor.com.br/api/health` retorna sucesso.
-- [ ] `curl -I https://velkor.com.br` retorna sucesso.
-- [ ] `curl -I https://velkor.com.br/robots.txt` retorna sucesso.
-- [ ] `curl -I https://velkor.com.br/sitemap.xml` retorna sucesso.
-- [ ] `SMOKE_BASE_URL=https://velkor.com.br npm run smoke --prefix frontend` passa.
+- [ ] `curl -i https://volkerr.com.br/api/health` retorna sucesso.
+- [ ] `curl -I https://volkerr.com.br` retorna sucesso.
+- [ ] `curl -I https://volkerr.com.br/robots.txt` retorna sucesso.
+- [ ] `curl -I https://volkerr.com.br/sitemap.xml` retorna sucesso.
+- [ ] `SMOKE_BASE_URL=https://volkerr.com.br npm run smoke --prefix frontend` passa.
 
 ## Fluxos manuais
 

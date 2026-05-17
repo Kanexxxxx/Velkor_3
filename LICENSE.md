@@ -90,4 +90,4 @@ Para licenciamento, parcerias ou autorização de uso:
 For licensing, partnerships, or usage authorization:
 
   velkor.officiall@gmail.com
-  https://velkor.com.br
+  https://volkerr.com.br
