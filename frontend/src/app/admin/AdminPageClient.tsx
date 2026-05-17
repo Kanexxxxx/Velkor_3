@@ -3,13 +3,119 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getInfoHref } from '@/services/infoPages';
-import { formatPrice, products } from '@/services/products';
+import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
-import { fetchAdminOrders, getAdminMe, isAdminApiUnavailable, legacyUnlock } from '@/services/adminApi';
+import {
+  createAdminProduct,
+  fetchAdminOrders,
+  fetchAdminProducts,
+  getAdminMe,
+  isAdminApiUnavailable,
+  legacyUnlock,
+  updateAdminProduct,
+  type AdminProduct
+} from '@/services/adminApi';
 import type { Order } from '@/types/order';
+import type { Product } from '@/types/product';
+
+const emptyProductForm = {
+  id: '',
+  slug: '',
+  name: '',
+  category: 'sneakers',
+  brand: 'VOLKERR',
+  price: '',
+  oldPrice: '',
+  badge: '',
+  discount: '',
+  colors: '#0a0a0a',
+  image: '',
+  images: '',
+  sizes: 'P, M, G',
+  tag: 'new',
+  active: true,
+};
+
+type ProductFormState = typeof emptyProductForm;
+
+function fallbackToAdminProduct(product: Product): AdminProduct {
+  return {
+    id: product.id,
+    slug: product.id,
+    name: product.name,
+    category: product.category,
+    brand: product.brand,
+    price: product.price,
+    oldPrice: product.oldPrice ?? null,
+    rating: product.rating,
+    reviews: product.reviews,
+    badge: product.badge ?? null,
+    discount: product.discount ?? null,
+    colors: product.colors,
+    image: product.image,
+    images: product.images ?? [],
+    sizes: product.sizes,
+    tag: product.tag,
+    active: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+}
+
+function productToForm(product: AdminProduct): ProductFormState {
+  return {
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    category: product.category,
+    brand: product.brand,
+    price: String(product.price),
+    oldPrice: product.oldPrice ? String(product.oldPrice) : '',
+    badge: product.badge ?? '',
+    discount: product.discount !== null && product.discount !== undefined ? String(product.discount) : '',
+    colors: product.colors.join(', '),
+    image: product.image,
+    images: product.images.join(', '),
+    sizes: product.sizes.join(', '),
+    tag: product.tag,
+    active: product.active,
+  };
+}
+
+function splitFormList(value: string) {
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function formToPayload(form: ProductFormState) {
+  return {
+    id: form.id,
+    slug: form.slug || form.id,
+    name: form.name,
+    category: form.category,
+    brand: form.brand,
+    price: Number(form.price),
+    oldPrice: form.oldPrice ? Number(form.oldPrice) : null,
+    badge: form.badge || null,
+    discount: form.discount ? Number(form.discount) : null,
+    colors: splitFormList(form.colors),
+    image: form.image,
+    images: splitFormList(form.images),
+    sizes: splitFormList(form.sizes),
+    tag: form.tag,
+    active: form.active,
+  };
+}
 
 export function AdminPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [adminProducts, setAdminProducts] = useState<AdminProduct[]>(fallbackProducts.map(fallbackToAdminProduct));
+  const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productSaving, setProductSaving] = useState(false);
+  const [productError, setProductError] = useState('');
   const [unlocked, setUnlocked] = useState(false);
   const [attempt, setAttempt] = useState('');
   const [error, setError] = useState('');
@@ -18,8 +124,9 @@ export function AdminPageClient() {
   const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
 
   async function loadRealAdminData() {
-    const remoteOrders = await fetchAdminOrders();
+    const [remoteOrders, remoteProducts] = await Promise.all([fetchAdminOrders(), fetchAdminProducts()]);
     setOrders(remoteOrders);
+    setAdminProducts(remoteProducts);
     setApiMode('real');
     setUnlocked(true);
   }
@@ -32,15 +139,17 @@ export function AdminPageClient() {
       setError('');
       try {
         await getAdminMe();
-        const remoteOrders = await fetchAdminOrders();
+        const [remoteOrders, remoteProducts] = await Promise.all([fetchAdminOrders(), fetchAdminProducts()]);
         if (cancelled) return;
         setOrders(remoteOrders);
+        setAdminProducts(remoteProducts);
         setApiMode('real');
         setUnlocked(true);
       } catch (err) {
         if (cancelled) return;
         if (isAdminApiUnavailable(err)) {
           setOrders(readOrders());
+          setAdminProducts(fallbackProducts.map(fallbackToAdminProduct));
           setApiMode('demo');
         } else {
           setUnlocked(false);
@@ -64,6 +173,7 @@ export function AdminPageClient() {
       await loadRealAdminData();
     } catch {
       setOrders(readOrders());
+      setAdminProducts(fallbackProducts.map(fallbackToAdminProduct));
       setApiMode('demo');
       setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
@@ -79,10 +189,48 @@ export function AdminPageClient() {
     return { revenue, pending, units };
   }, [orders]);
 
-  const categoryCounts = products.reduce<Record<string, number>>((counts, product) => {
+  const categoryCounts = adminProducts.reduce<Record<string, number>>((counts, product) => {
     counts[product.category] = (counts[product.category] ?? 0) + 1;
     return counts;
   }, {});
+
+  async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProductSaving(true);
+    setProductError('');
+    try {
+      const payload = formToPayload(productForm);
+      const saved = editingProductId
+        ? await updateAdminProduct(editingProductId, payload)
+        : await createAdminProduct(payload);
+      setAdminProducts(current => {
+        const exists = current.some(product => product.id === saved.id);
+        const next = exists
+          ? current.map(product => product.id === saved.id ? saved : product)
+          : [saved, ...current];
+        return next.sort((a, b) => a.name.localeCompare(b.name));
+      });
+      setProductForm(emptyProductForm);
+      setEditingProductId(null);
+    } catch (err) {
+      setProductError(err instanceof Error ? err.message : 'Nao foi possivel salvar produto.');
+    } finally {
+      setProductSaving(false);
+    }
+  }
+
+  async function toggleProduct(product: AdminProduct) {
+    setProductSaving(true);
+    setProductError('');
+    try {
+      const saved = await updateAdminProduct(product.id, { active: !product.active });
+      setAdminProducts(current => current.map(item => item.id === saved.id ? saved : item));
+    } catch (err) {
+      setProductError(err instanceof Error ? err.message : 'Nao foi possivel atualizar produto.');
+    } finally {
+      setProductSaving(false);
+    }
+  }
 
   if (checkingAdmin) {
     return (
@@ -188,7 +336,7 @@ export function AdminPageClient() {
             </div>
             <div className="info-block">
               <h2>Produtos</h2>
-              <p>{products.length} itens cadastrados</p>
+              <p>{adminProducts.length} itens cadastrados</p>
             </div>
             <div className="info-block">
               <h2>Unidades vendidas</h2>
@@ -234,15 +382,205 @@ export function AdminPageClient() {
             </section>
 
             <section className="info-block">
-              <h2>Catalogo ativo</h2>
+              <h2>Catalogo admin</h2>
+              <form className="form-block account-form" onSubmit={handleProductSubmit} style={{ marginBottom: 28 }}>
+                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                  <div className="field">
+                    <label htmlFor="admin-product-id">ID</label>
+                    <input
+                      id="admin-product-id"
+                      value={productForm.id}
+                      onChange={event => setProductForm(current => ({ ...current, id: event.target.value }))}
+                      disabled={Boolean(editingProductId)}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-slug">Slug</label>
+                    <input
+                      id="admin-product-slug"
+                      value={productForm.slug}
+                      onChange={event => setProductForm(current => ({ ...current, slug: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-category">Categoria</label>
+                    <select
+                      id="admin-product-category"
+                      value={productForm.category}
+                      onChange={event => setProductForm(current => ({ ...current, category: event.target.value }))}
+                    >
+                      <option value="sneakers">Tenis</option>
+                      <option value="apparel">Vestuario</option>
+                      <option value="accessories">Acessorios</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-name">Nome</label>
+                    <input
+                      id="admin-product-name"
+                      value={productForm.name}
+                      onChange={event => setProductForm(current => ({ ...current, name: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-brand">Marca</label>
+                    <input
+                      id="admin-product-brand"
+                      value={productForm.brand}
+                      onChange={event => setProductForm(current => ({ ...current, brand: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-price">Preco</label>
+                    <input
+                      id="admin-product-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={productForm.price}
+                      onChange={event => setProductForm(current => ({ ...current, price: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-old-price">Preco antigo</label>
+                    <input
+                      id="admin-product-old-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={productForm.oldPrice}
+                      onChange={event => setProductForm(current => ({ ...current, oldPrice: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-discount">Desconto %</label>
+                    <input
+                      id="admin-product-discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={productForm.discount}
+                      onChange={event => setProductForm(current => ({ ...current, discount: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-image">Imagem principal</label>
+                    <input
+                      id="admin-product-image"
+                      value={productForm.image}
+                      onChange={event => setProductForm(current => ({ ...current, image: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-images">Galeria</label>
+                    <input
+                      id="admin-product-images"
+                      value={productForm.images}
+                      onChange={event => setProductForm(current => ({ ...current, images: event.target.value }))}
+                      placeholder="URLs separadas por virgula"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-colors">Cores</label>
+                    <input
+                      id="admin-product-colors"
+                      value={productForm.colors}
+                      onChange={event => setProductForm(current => ({ ...current, colors: event.target.value }))}
+                      placeholder="#0a0a0a, #ffffff"
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-sizes">Tamanhos</label>
+                    <input
+                      id="admin-product-sizes"
+                      value={productForm.sizes}
+                      onChange={event => setProductForm(current => ({ ...current, sizes: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-badge">Selo</label>
+                    <input
+                      id="admin-product-badge"
+                      value={productForm.badge}
+                      onChange={event => setProductForm(current => ({ ...current, badge: event.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-tag">Tag</label>
+                    <input
+                      id="admin-product-tag"
+                      value={productForm.tag}
+                      onChange={event => setProductForm(current => ({ ...current, tag: event.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                  <input
+                    type="checkbox"
+                    checked={productForm.active}
+                    onChange={event => setProductForm(current => ({ ...current, active: event.target.checked }))}
+                  />
+                  Produto ativo na loja
+                </label>
+                {productError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productError}</p> : null}
+                {apiMode !== 'real' ? <p className="meta" style={{ marginTop: 12 }}>Entre como ADMIN real para salvar produtos no PostgreSQL.</p> : null}
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
+                  <button type="submit" className="btn btn-primary" disabled={productSaving || apiMode !== 'real'}>
+                    {productSaving ? 'Salvando...' : editingProductId ? 'Salvar produto' : 'Criar produto'}
+                  </button>
+                  {editingProductId ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setProductForm(emptyProductForm);
+                        setEditingProductId(null);
+                        setProductError('');
+                      }}
+                    >
+                      Cancelar edicao
+                    </button>
+                  ) : null}
+                </div>
+              </form>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {products.slice(0, 8).map(product => (
+                {adminProducts.slice(0, 12).map(product => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
                     <div>
                       <h5>{product.name}</h5>
                       <div className="meta">{product.brand} · {product.category}</div>
                     </div>
-                    <div className="price">{formatPrice(product.price)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <div className="price">{formatPrice(product.price)}</div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setProductForm(productToForm(product));
+                          setEditingProductId(product.id);
+                          setProductError('');
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => toggleProduct(product)}
+                        disabled={productSaving || apiMode !== 'real'}
+                      >
+                        {product.active ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

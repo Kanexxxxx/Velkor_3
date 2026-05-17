@@ -91,4 +91,12 @@ test.describe('VOLKERR core flows', () => {
     await expect(page.getByText(/Token de confirmacao ausente|API indisponivel|Nao foi possivel confirmar/i)).toBeVisible();
     await expect(page.getByRole('link', { name: /Continuar|Ir para minha conta/i }).first()).toBeVisible();
   });
+
+  test('renders protected admin shell with API unavailable', async ({ page }) => {
+    await page.goto('/admin');
+
+    await expect(page.getByText('PAINEL ADMIN')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Acesso Restrito/i })).toBeVisible();
+    await expect(page.getByLabel('Senha de acesso legado')).toBeVisible();
+  });
 });
