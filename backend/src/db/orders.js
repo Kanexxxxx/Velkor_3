@@ -41,8 +41,8 @@ function validateOrderInput(input) {
   if (!normalizeText(address.region, 40)) return { error: 'Estado invalido.' };
   if (!normalizeText(address.postalCode, 20)) return { error: 'CEP invalido.' };
 
-  const shipping = input.shipping === 'express' ? 'express' : 'standard';
-  const payment = ['card', 'mercado-pago', 'pix', 'boleto'].includes(input.payment) ? input.payment : 'card';
+  const shipping = normalizeText(input.shipping, 120) || 'standard';
+  const payment = 'mercado-pago';
 
   return {
     value: {
@@ -91,7 +91,26 @@ async function getCouponDiscount(prisma, couponCode, subtotalCents) {
   return { discountCents, couponCode: coupon.code };
 }
 
-async function buildOrderQuote(prisma, input) {
+async function resolveShippingCents(input, items, subtotalCents, options = {}) {
+  if (SHIPPING_CENTS[input.shipping] !== undefined) {
+    return { shippingCents: SHIPPING_CENTS[input.shipping], shippingMethod: input.shipping };
+  }
+
+  if (!options.shippingService?.quoteShipping) {
+    throw makeError('Frete indisponivel. Calcule o frete novamente.', 400);
+  }
+
+  const result = await options.shippingService.quoteShipping({
+    toPostalCode: input.address?.postalCode,
+    items,
+    subtotalCents,
+  });
+  const quote = result?.quotes?.find(item => item.id === input.shipping);
+  if (!quote) throw makeError('Opcao de frete expirada. Calcule o frete novamente.', 400);
+  return { shippingCents: quote.priceCents, shippingMethod: quote.id };
+}
+
+async function buildOrderQuote(prisma, input, options = {}) {
   const productIds = Array.from(new Set(input.items.map(item => item.productId)));
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, active: true },
@@ -110,11 +129,11 @@ async function buildOrderQuote(prisma, input) {
   });
 
   const subtotalCents = items.reduce((sum, item) => sum + item.lineTotalCents, 0);
-  const shippingCents = SHIPPING_CENTS[input.shipping] ?? 0;
+  const { shippingCents, shippingMethod } = await resolveShippingCents(input, items, subtotalCents, options);
   const { discountCents, couponCode } = await getCouponDiscount(prisma, input.coupon, subtotalCents);
   const totalCents = Math.max(0, subtotalCents + shippingCents - discountCents);
 
-  return { items, subtotalCents, shippingCents, discountCents, totalCents, couponCode };
+  return { items, subtotalCents, shippingCents, shippingMethod, discountCents, totalCents, couponCode };
 }
 
 function toApiOrder(order) {
@@ -135,7 +154,7 @@ function toApiOrder(order) {
     discount: order.discountCents / 100,
     coupon: order.couponCode || undefined,
     total: order.totalCents / 100,
-    payment: order.paymentMethod || 'card',
+    payment: order.paymentMethod || 'mercado-pago',
     shipping: order.shippingMethod || 'standard',
     contact: {
       name: order.contactName || address?.fullName || '',
@@ -159,7 +178,7 @@ function toApiOrder(order) {
   };
 }
 
-async function createOrder(sessionId, rawInput) {
+async function createOrder(sessionId, rawInput, options = {}) {
   const prisma = getPrisma();
   if (!prisma) {
     const parsed = validateOrderInput(rawInput);
@@ -170,7 +189,7 @@ async function createOrder(sessionId, rawInput) {
   const parsed = validateOrderInput(rawInput);
   if (parsed.error) throw makeError(parsed.error);
   const input = parsed.value;
-  const quote = await buildOrderQuote(prisma, input);
+  const quote = await buildOrderQuote(prisma, input, options);
 
   const order = await prisma.$transaction(async tx => {
     const address = await tx.address.create({
@@ -200,7 +219,7 @@ async function createOrder(sessionId, rawInput) {
         totalCents: quote.totalCents,
         couponCode: quote.couponCode,
         paymentMethod: input.payment,
-        shippingMethod: input.shipping,
+        shippingMethod: quote.shippingMethod,
         shippingAddressId: address.id,
         items: {
           create: quote.items.map(item => ({

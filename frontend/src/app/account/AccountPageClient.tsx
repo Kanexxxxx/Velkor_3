@@ -7,6 +7,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
+import { requestEmailVerification } from '@/services/authApi';
 import { getInfoHref } from '@/services/infoPages';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
 import { formatPrice, getProductById } from '@/services/products';
@@ -61,11 +62,15 @@ export function AccountPageClient() {
           notify(`Conta criada. Bem-vindo, ${next.name.split(' ')[0]}.`, 'success');
           router.push('/account?tab=profile');
         }}
-        onForgot={email => {
+        onForgot={async email => {
           try {
-            const result = requestPasswordReset(email);
+            const result = await requestPasswordReset(email);
+            if (!result.token) {
+              notify('Se este email estiver cadastrado, enviamos o link de recuperacao.', 'success');
+              return null;
+            }
             const link = `${window.location.origin}/account/reset-password?token=${result.token}`;
-            notify('Email de recuperação enviado. Em produção o link chega no seu inbox.', 'success');
+            notify(result.delivered ? 'Email de recuperacao enviado.' : 'Link de recuperacao gerado em modo demo.', 'success');
             if (process.env.NODE_ENV === 'development') {
               console.info('VELKOR · Link de recuperação (modo demo):', link);
             }
@@ -94,7 +99,7 @@ export function AccountPageClient() {
 interface AuthLandingProps {
   onLogin: (input: { email: string; password: string }) => Promise<void>;
   onRegister: (input: { name: string; email: string; password: string }) => Promise<void>;
-  onForgot: (email: string) => string | null;
+  onForgot: (email: string) => Promise<string | null>;
 }
 
 function AuthLandingView({ onLogin, onRegister, onForgot }: AuthLandingProps) {
@@ -172,9 +177,9 @@ function AuthLandingView({ onLogin, onRegister, onForgot }: AuthLandingProps) {
           <section className="auth-grid auth-grid-single" key="forgot-password">
             <form
               className="form-block"
-              onSubmit={event => {
+              onSubmit={async event => {
                 event.preventDefault();
-                const link = onForgot(forgotEmail);
+                const link = await onForgot(forgotEmail);
                 if (link) setForgotLink(link);
               }}
             >
@@ -267,10 +272,12 @@ interface AccountDashboardProps {
 function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
   const { user } = useAuth();
   const { productIds } = useWishlist();
+  const { notify } = useNotifications();
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const [verificationPending, setVerificationPending] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -310,6 +317,31 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
           </div>
           <button type="button" className="btn btn-ghost account-logout" onClick={onLogout}>Sair da conta</button>
         </header>
+
+        {user.emailVerified === false ? (
+          <section className="info-block" style={{ marginBottom: 24 }}>
+            <h2>Confirme seu email</h2>
+            <p>Os avisos de pedido, envio e recuperacao de senha chegam em {user.email}.</p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={verificationPending}
+              onClick={async () => {
+                try {
+                  setVerificationPending(true);
+                  await requestEmailVerification();
+                  notify('Email de verificacao enviado.', 'success');
+                } catch (error) {
+                  notify(error instanceof Error ? error.message : 'Nao foi possivel enviar a verificacao.', 'error');
+                } finally {
+                  setVerificationPending(false);
+                }
+              }}
+            >
+              {verificationPending ? 'Enviando...' : 'Enviar verificacao'}
+            </button>
+          </section>
+        ) : null}
 
         <section className="account-stats">
           <div className="stat-card">
@@ -523,7 +555,7 @@ function OrdersPanel({ orders, loading, error, onRetry }: {
   );
 }
 
-function paymentLabel(payment: Order['payment']) {
+function paymentLabel(payment: string | undefined) {
   switch (payment) {
     case 'card': return 'Cartão';
     case 'mercado-pago': return 'Mercado Pago';

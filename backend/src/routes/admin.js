@@ -1,6 +1,9 @@
 const adminRepo = require('../db/admin');
 const authRepoDefault = require('../db/auth');
 const { requireAdmin, sendJson } = require('./guards');
+const { saveProductImageUpload } = require('../services/uploads');
+const { createEmailClient } = require('../services/email');
+const { sendOrderShippedIfNeeded } = require('../services/order-email');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
 const WRITE_LIMIT = { limit: 20, windowMs: 60 * 1000 };
@@ -70,7 +73,9 @@ function extractId(pathname, prefix, suffix = '') {
   return value || null;
 }
 
-function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appConfig = {} } = {}) {
+function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appConfig = {}, uploadRoot, emailService } = {}) {
+  const adminEmailService = emailService || createEmailClient(appConfig);
+
   return async function handleAdminRequest(req, res, corsOrigin) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (!url.pathname.startsWith('/api/admin')) return false;
@@ -126,6 +131,17 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname === '/api/admin/uploads/product-image' && req.method === 'POST') {
+        if (!uploadRoot) {
+          sendJson(res, 503, { error: 'Upload nao configurado.' }, corsOrigin);
+          return true;
+        }
+        const payload = JSON.parse(await readBody(req, 7 * 1024 * 1024) || '{}');
+        const upload = saveProductImageUpload(payload, { uploadRoot });
+        sendJson(res, 201, upload, corsOrigin);
+        return true;
+      }
+
       if (url.pathname.startsWith('/api/admin/products/') && req.method === 'PATCH') {
         const id = extractId(url.pathname, '/api/admin/products/');
         sendJson(res, 200, await repo.updateProduct(id, await readJson(req), adminUserId), corsOrigin);
@@ -135,7 +151,10 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
       if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/status') && req.method === 'PATCH') {
         const id = extractId(url.pathname, '/api/admin/orders/', '/status');
         const payload = await readJson(req);
-        sendJson(res, 200, await repo.updateOrderStatus(id, payload.status, adminUserId), corsOrigin);
+        const result = await repo.updateOrderStatus(id, payload.status, adminUserId);
+        const email = await sendOrderShippedIfNeeded({ orderResult: result, emailService: adminEmailService });
+        if (email) result.email = email;
+        sendJson(res, 200, result, corsOrigin);
         return true;
       }
 

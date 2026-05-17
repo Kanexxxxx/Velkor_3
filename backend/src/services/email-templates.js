@@ -34,8 +34,16 @@ function orderConfirmationTemplate({ order }) {
   const itemCount = Array.isArray(order.items) ? order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) : 0;
   return {
     subject: `VELKOR - pedido ${order.id} confirmado`,
-    text: `Recebemos seu pedido ${order.id}. Total: ${total}. Itens: ${itemCount}.`,
-    html: baseHtml('Pedido confirmado', `<p>Recebemos seu pedido <strong>${order.id}</strong>.</p><p>Total: <strong>${total}</strong></p><p>Itens: ${itemCount}</p>`),
+    text: `Parabens pela compra. Recebemos seu pedido ${order.id}. Total: ${total}. Itens: ${itemCount}. Voce recebera novas atualizacoes por email.`,
+    html: baseHtml('Pedido confirmado', `<p>Parabens pela compra. Recebemos seu pedido <strong>${order.id}</strong>.</p><p>Total: <strong>${total}</strong></p><p>Itens: ${itemCount}</p><p>Voce recebera novas atualizacoes por email.</p>`),
+  };
+}
+
+function orderShippedTemplate({ order }) {
+  return {
+    subject: `VELKOR - pedido ${order.id} enviado`,
+    text: `Seu pedido ${order.id} foi enviado. Em breve voce recebe ou acompanha as atualizacoes de entrega pelos canais da VELKOR.`,
+    html: baseHtml('Pedido enviado', `<p>Seu pedido <strong>${order.id}</strong> foi enviado.</p><p>Em breve voce recebe ou acompanha as atualizacoes de entrega pelos canais da VELKOR.</p>`),
   };
 }
 
@@ -51,5 +59,6 @@ module.exports = {
   emailVerificationTemplate,
   newsletterOptInTemplate,
   orderConfirmationTemplate,
+  orderShippedTemplate,
   passwordResetTemplate,
 };

@@ -33,7 +33,7 @@ interface AuthContextValue {
   register: (input: { name: string; email: string; password: string }) => Promise<User>;
   login: (input: { email: string; password: string }) => Promise<User>;
   logout: () => void;
-  requestPasswordReset: (email: string) => { token: string; expiresAt: string };
+  requestPasswordReset: (email: string) => Promise<{ token: string; expiresAt: string; delivered: boolean }>;
   resetPassword: (input: { token: string; password: string }) => Promise<User>;
   updateProfile: (patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => User;
   changePassword: (input: { currentPassword: string; nextPassword: string }) => Promise<void>;
@@ -146,12 +146,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const requestPasswordReset = useCallback<AuthContextValue['requestPasswordReset']>(email => {
+  const requestPasswordReset = useCallback<AuthContextValue['requestPasswordReset']>(async email => {
     if (!isValidEmail(email)) throw new Error('Informe um email valido.');
-    authApi.requestPasswordReset(email).catch(() => undefined);
+    let delivered = false;
+    try {
+      await authApi.requestPasswordReset(email);
+      delivered = true;
+    } catch (error) {
+      if (!authApi.isAuthApiUnavailable(error)) throw error;
+    }
     const result = setResetToken(email);
-    if (!result) throw new Error('Nao encontramos esta conta.');
-    return { token: result.token, expiresAt: result.user.resetTokenExpiresAt ?? '' };
+    if (!result) return { token: '', expiresAt: '', delivered };
+    return { token: result.token, expiresAt: result.user.resetTokenExpiresAt ?? '', delivered };
   }, []);
 
   const resetPassword = useCallback<AuthContextValue['resetPassword']>(async ({ token, password }) => {

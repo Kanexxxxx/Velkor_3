@@ -45,6 +45,12 @@ test.describe('VOLKERR core flows', () => {
   });
 
   test('submits checkout with local fallback when the API is unavailable', async ({ page }) => {
+    await page.route('**/api/shipping/quote', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ quotes: [{ id: 'standard', provider: 'fallback', name: 'Frete teste', price: 0, priceCents: 0, deliveryTime: 6 }] })
+    }));
+
     await page.goto('/product/v01');
     const checkoutLink = await addProductAndOpenCart(page);
     await checkoutLink.click();

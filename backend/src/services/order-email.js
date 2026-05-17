@@ -17,4 +17,18 @@ async function sendOrderConfirmationIfNeeded({ orderResult, emailService = creat
   }
 }
 
-module.exports = { sendOrderConfirmationIfNeeded };
+async function sendOrderShippedIfNeeded({ orderResult, emailService = createEmailClient() }) {
+  if (!orderResult?.order || orderResult.storage !== 'database') return null;
+  if (!['shipped', 'fulfilled'].includes(String(orderResult.order.status || '').toLowerCase())) return null;
+  const to = getOrderEmail(orderResult.order);
+  if (!to) return null;
+
+  try {
+    return await emailService.sendOrderShipped({ to, order: orderResult.order });
+  } catch (err) {
+    console.warn(`email.order_shipped.failed order=${orderResult.order.id} message=${err instanceof Error ? err.message : 'unknown'}`);
+    return { sent: false, mode: 'error' };
+  }
+}
+
+module.exports = { sendOrderConfirmationIfNeeded, sendOrderShippedIfNeeded };

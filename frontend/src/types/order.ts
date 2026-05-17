@@ -1,11 +1,11 @@
 import type { CartItem } from './cart';
 import type { Address } from './user';
 
-export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'fulfilled' | 'delivered' | 'cancelled';
 
-export type OrderPayment = 'card' | 'mercado-pago' | 'pix' | 'boleto';
+export type OrderPayment = 'mercado-pago';
 
-export type OrderShipping = 'standard' | 'express';
+export type OrderShipping = string;
 
 export interface OrderContact {
   name: string;

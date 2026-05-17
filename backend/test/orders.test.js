@@ -53,3 +53,53 @@ test('order totals are calculated from product prices, shipping, and coupon', as
   assert.equal(quote.shippingCents, 3900);
   assert.equal(quote.totalCents, 25150);
 });
+
+test('order totals use a server-side Melhor Envio shipping quote', async () => {
+  const { buildOrderQuote } = require('../src/db/orders');
+
+  const prisma = {
+    product: {
+      findMany: async () => [
+        { id: 'v01', name: 'Produto 1', priceCents: 10000, active: true },
+      ],
+    },
+    coupon: {
+      findUnique: async () => null,
+    },
+  };
+
+  const quote = await buildOrderQuote(prisma, {
+    items: [{ productId: 'v01', quantity: 1, size: '42', color: '#0a0a0a' }],
+    coupon: null,
+    shipping: 'melhor-envio:sedex',
+    address: { postalCode: '14030-410' },
+  }, {
+    shippingService: {
+      quoteShipping: async () => ({
+        quotes: [
+          { id: 'melhor-envio:sedex', name: 'SEDEX', priceCents: 1282, deliveryTime: 3 },
+        ],
+      }),
+    },
+  });
+
+  assert.equal(quote.subtotalCents, 10000);
+  assert.equal(quote.shippingCents, 1282);
+  assert.equal(quote.totalCents, 11282);
+  assert.equal(quote.shippingMethod, 'melhor-envio:sedex');
+});
+
+test('order payload validation normalizes payment to Mercado Pago', () => {
+  const { validateOrderInput } = require('../src/db/orders');
+
+  const parsed = validateOrderInput({
+    items: [{ productId: 'v01', quantity: 1, size: '42', color: '#0a0a0a' }],
+    contact: { name: 'Kaina', email: 'kaina@example.com' },
+    address: { recipient: 'Kaina', street: 'Rua A', city: 'Sao Paulo', region: 'SP', postalCode: '14000-000', country: 'Brasil' },
+    shipping: 'standard',
+    payment: 'pix',
+  });
+
+  assert.equal(parsed.error, undefined);
+  assert.equal(parsed.value.payment, 'mercado-pago');
+});

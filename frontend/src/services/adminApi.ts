@@ -173,6 +173,13 @@ export async function updateAdminProduct(id: string, payload: Partial<AdminProdu
   return data.product;
 }
 
+export async function uploadAdminProductImage(input: { filename: string; dataUrl: string }) {
+  return request<{ url: string; filename: string; mimeType: string; size: number }>('/api/admin/uploads/product-image', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function updateAdminOrderStatus(id: string, status: Order['status']) {
   const data = await request<{ order: Order }>(`/api/admin/orders/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',

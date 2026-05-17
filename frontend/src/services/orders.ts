@@ -48,6 +48,7 @@ export const orderStatusLabels: Record<Order['status'], { label: string; tone: '
   paid: { label: 'Pagamento aprovado', tone: 'paid' },
   processing: { label: 'Em separação', tone: 'paid' },
   shipped: { label: 'Enviado', tone: 'shipped' },
+  fulfilled: { label: 'Enviado', tone: 'shipped' },
   delivered: { label: 'Entregue', tone: 'delivered' },
   cancelled: { label: 'Cancelado', tone: 'cancelled' }
 };
