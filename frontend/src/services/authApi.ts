@@ -136,3 +136,10 @@ export async function confirmPasswordReset(token: string, newPassword: string) {
     body: JSON.stringify({ token, newPassword }),
   });
 }
+
+export async function confirmEmailVerification(token: string) {
+  await request<{ ok: true }>('/email-verification/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}

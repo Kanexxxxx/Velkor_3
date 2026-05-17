@@ -21,7 +21,7 @@ Confirme processos atuais:
 
 ```bash
 pm2 status
-curl -i https://velkor.com.br/api/health
+curl -i https://volkerr.com.br/api/health
 ```
 
 ## Rollback antes de migrations
@@ -35,7 +35,7 @@ npm ci --prefix backend
 npm ci --prefix frontend
 npm run build --prefix frontend
 pm2 restart velkor-backend velkor-frontend
-curl -i https://velkor.com.br/api/health
+curl -i https://volkerr.com.br/api/health
 ```
 
 ## Rollback depois de migrations
@@ -62,7 +62,7 @@ npm ci --prefix backend
 npm ci --prefix frontend
 npm run build --prefix frontend
 pm2 restart velkor-backend velkor-frontend
-curl -i https://velkor.com.br/api/health
+curl -i https://volkerr.com.br/api/health
 ```
 
 ## Admin emergencial
@@ -121,8 +121,8 @@ Se envio real estiver falhando:
 pm2 status
 pm2 logs velkor-backend --lines 100
 pm2 logs velkor-frontend --lines 100
-curl -i https://velkor.com.br/api/health
-curl -I https://velkor.com.br
+curl -i https://volkerr.com.br/api/health
+curl -I https://volkerr.com.br
 ```
 
 Teste manualmente:

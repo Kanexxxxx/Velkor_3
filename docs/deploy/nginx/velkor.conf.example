@@ -1,7 +1,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name velkor.com.br www.velkor.com.br;
+    server_name volkerr.com.br www.volkerr.com.br;
 
     location /.well-known/acme-challenge/ {
         root /var/www/html;
@@ -15,10 +15,10 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name velkor.com.br www.velkor.com.br;
+    server_name volkerr.com.br www.volkerr.com.br;
 
-    ssl_certificate /etc/letsencrypt/live/velkor.com.br/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/velkor.com.br/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/volkerr.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/volkerr.com.br/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 

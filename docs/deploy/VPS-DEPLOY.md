@@ -2,7 +2,7 @@
 
 Stack de producao: Ubuntu 22.04/24.04 LTS, Node.js 20 LTS, PostgreSQL, PM2, nginx e Certbot.
 
-Este guia assume que o dominio `velkor.com.br` aponta para o IP da VPS. Troque o dominio em todos os exemplos quando necessario.
+Este guia assume que o dominio `volkerr.com.br` aponta para o IP da VPS. Troque o dominio em todos os exemplos quando necessario.
 
 ## 1. Preparar servidor
 
@@ -85,8 +85,8 @@ NODE_ENV=production
 PORT=3001
 DATABASE_URL=postgresql://velkor_user:troque-esta-senha@127.0.0.1:5432/velkor
 SESSION_SECRET=<gere-com-64-bytes-aleatorios>
-ALLOWED_ORIGINS=https://velkor.com.br,https://www.velkor.com.br
-VELKOR_PUBLIC_URL=https://velkor.com.br
+ALLOWED_ORIGINS=https://volkerr.com.br,https://www.volkerr.com.br
+VELKOR_PUBLIC_URL=https://volkerr.com.br
 
 ADMIN_EMAIL=<email-do-primeiro-admin>
 ADMIN_PASSWORD=<senha-forte-temporaria>
@@ -118,8 +118,8 @@ nano frontend/.env.local
 ```
 
 ```env
-NEXT_PUBLIC_API_URL=https://velkor.com.br
-NEXT_PUBLIC_BRAND_SITE_URL=https://velkor.com.br
+NEXT_PUBLIC_API_URL=https://volkerr.com.br
+NEXT_PUBLIC_BRAND_SITE_URL=https://volkerr.com.br
 NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=<public-key-mercado-pago>
 ```
 
@@ -192,7 +192,7 @@ systemctl reload nginx
 ## 10. SSL com Certbot
 
 ```bash
-certbot --nginx -d velkor.com.br -d www.velkor.com.br
+certbot --nginx -d volkerr.com.br -d www.volkerr.com.br
 certbot renew --dry-run
 nginx -t
 systemctl reload nginx
@@ -201,17 +201,17 @@ systemctl reload nginx
 ## 11. Smoke tests pos-deploy
 
 ```bash
-curl -i https://velkor.com.br/api/health
-curl -I https://velkor.com.br
-curl -I https://velkor.com.br/robots.txt
-curl -I https://velkor.com.br/sitemap.xml
+curl -i https://volkerr.com.br/api/health
+curl -I https://volkerr.com.br
+curl -I https://volkerr.com.br/robots.txt
+curl -I https://volkerr.com.br/sitemap.xml
 ```
 
 Frontend smoke:
 
 ```bash
 cd /var/www/velkor/frontend
-SMOKE_BASE_URL=https://velkor.com.br npm run smoke
+SMOKE_BASE_URL=https://volkerr.com.br npm run smoke
 ```
 
 Fluxos manuais obrigatorios antes de abrir trafego real:
@@ -240,7 +240,7 @@ npm run db:deploy --prefix backend
 npm run build --prefix frontend
 pm2 restart velkor-backend velkor-frontend
 
-curl -i https://velkor.com.br/api/health
+curl -i https://volkerr.com.br/api/health
 ```
 
 ## 13. Auditoria antes de producao real
