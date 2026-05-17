@@ -26,14 +26,18 @@ test('auth session tokens are hashed without exposing the raw token', () => {
 
 test('auth repository uses demo-disabled results without database config', async () => {
   delete process.env.DATABASE_URL;
-  const { createSession, findSessionUser, listSessions } = require('../src/db/auth');
+  const { createEmailVerificationToken, createSession, consumeEmailVerificationToken, findSessionUser, listSessions } = require('../src/db/auth');
 
   const session = await createSession({ userId: 'usr_demo' });
   const user = await findSessionUser('not-a-real-token');
   const sessions = await listSessions('usr_demo');
+  const verificationToken = await createEmailVerificationToken('usr_demo');
+  const verificationResult = await consumeEmailVerificationToken('not-a-real-token');
 
   assert.equal(session, null);
   assert.equal(user, null);
+  assert.equal(verificationToken, null);
+  assert.equal(verificationResult, false);
   assert.deepEqual(sessions, []);
 });
 
