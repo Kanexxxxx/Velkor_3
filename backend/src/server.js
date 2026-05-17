@@ -9,6 +9,7 @@ const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orde
 const { getSessionId } = require('./db/session');
 const { createAuthHandler } = require('./routes/auth');
 const { createAdminHandler } = require('./routes/admin');
+const { createPaymentsHandler } = require('./routes/payments');
 const { sendOrderConfirmationIfNeeded } = require('./services/order-email');
 const { createEmailClient } = require('./services/email');
 
@@ -42,6 +43,7 @@ for (const [key, value] of Object.entries(appConfig)) {
 
 const handleAuthRequest = createAuthHandler();
 const handleAdminRequest = createAdminHandler({ appConfig });
+const handlePaymentsRequest = createPaymentsHandler({ appConfig });
 const emailClient = createEmailClient(appConfig);
 
 // Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
@@ -269,6 +271,7 @@ async function handleRequest(req, res) {
 
   if (await handleAuthRequest(req, res, corsOrigin)) return;
   if (await handleAdminRequest(req, res, corsOrigin)) return;
+  if (await handlePaymentsRequest(req, res, corsOrigin)) return;
 
   if (url.pathname === '/api/products' && req.method === 'GET') {
     try {
