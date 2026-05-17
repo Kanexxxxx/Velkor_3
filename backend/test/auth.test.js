@@ -114,3 +114,34 @@ test('auth route returns current user from session cookie and logs out', async (
   assert.equal(deletedToken, 'b'.repeat(64));
   assert.match(logoutRes.headers['Set-Cookie'], /Max-Age=0/);
 });
+
+test('admin guards reject missing sessions and customer users', async () => {
+  const { requireAuth, requireAdmin } = require('../src/routes/guards');
+  const missingRes = makeRes();
+  const customerRes = makeRes();
+
+  assert.equal(await requireAuth(makeReq(), missingRes, null, { findSessionUser: async () => null }), null);
+  assert.equal(missingRes.statusCode, 401);
+
+  assert.equal(await requireAdmin(
+    makeReq({ headers: { cookie: `velkor_sid=${'c'.repeat(64)}` } }),
+    customerRes,
+    null,
+    { findSessionUser: async () => ({ user: { id: 'usr_1', role: 'CUSTOMER' } }) }
+  ), null);
+  assert.equal(customerRes.statusCode, 403);
+});
+
+test('admin guards allow admin sessions', async () => {
+  const { requireAdmin } = require('../src/routes/guards');
+  const res = makeRes();
+  const context = await requireAdmin(
+    makeReq({ headers: { cookie: `velkor_sid=${'d'.repeat(64)}` } }),
+    res,
+    null,
+    { findSessionUser: async () => ({ user: { id: 'adm_1', role: 'ADMIN' } }) }
+  );
+
+  assert.equal(context.user.id, 'adm_1');
+  assert.equal(res.statusCode, 0);
+});
