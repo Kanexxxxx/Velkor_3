@@ -109,3 +109,12 @@ test('legacy admin unlock returns gone when disabled', async () => {
 
   assert.equal(res.statusCode, 410);
 });
+
+test('admin seed builds configured admin input from environment', () => {
+  const { buildAdminSeedInput } = require('../prisma/seed');
+  const input = buildAdminSeedInput({ ADMIN_EMAIL: 'OWNER@EXAMPLE.COM', ADMIN_PASSWORD: 'super-secret-password' });
+
+  assert.equal(input.email, 'owner@example.com');
+  assert.equal(input.role, 'ADMIN');
+  assert.equal(input.password, 'super-secret-password');
+});

@@ -1,11 +1,21 @@
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { categories, products } = require('../src/db/seed-data');
+const { hashPassword } = require('../src/db/auth');
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-const prisma = new PrismaClient({ adapter });
+function buildAdminSeedInput(env = process.env) {
+  const email = typeof env.ADMIN_EMAIL === 'string' ? env.ADMIN_EMAIL.trim().toLowerCase() : '';
+  const password = typeof env.ADMIN_PASSWORD === 'string' ? env.ADMIN_PASSWORD : '';
+  if (!email || !password) return null;
+  return { email, password, role: 'ADMIN' };
+}
 
-async function main() {
+function createPrismaClient() {
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  return new PrismaClient({ adapter });
+}
+
+async function seedCatalog(prisma) {
   for (const category of categories) {
     await prisma.category.upsert({
       where: { slug: category.slug },
@@ -73,12 +83,42 @@ async function main() {
   });
 }
 
-main()
-  .finally(async () => {
+async function seedAdmin(prisma, env = process.env) {
+  const admin = buildAdminSeedInput(env);
+  if (!admin) return null;
+
+  const passwordHash = await hashPassword(admin.password);
+  const user = await prisma.user.upsert({
+    where: { email: admin.email },
+    update: { role: 'ADMIN', passwordHash },
+    create: {
+      email: admin.email,
+      name: 'Admin VELKOR',
+      role: 'ADMIN',
+      passwordHash,
+      emailVerified: true,
+    },
+  });
+
+  console.log(`Admin seed ensured for ${user.email}`);
+  return user;
+}
+
+async function main() {
+  const prisma = createPrismaClient();
+  try {
+    await seedCatalog(prisma);
+    await seedAdmin(prisma);
+  } finally {
     await prisma.$disconnect();
-  })
-  .catch(async error => {
+  }
+}
+
+if (require.main === module) {
+  main().catch(async error => {
     console.error(error);
-    await prisma.$disconnect();
     process.exit(1);
   });
+}
+
+module.exports = { buildAdminSeedInput, seedAdmin, seedCatalog };
