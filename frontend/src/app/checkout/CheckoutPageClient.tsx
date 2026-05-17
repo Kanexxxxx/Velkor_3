@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCart } from '@/components/cart/CartProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
@@ -12,16 +12,12 @@ import { isValidEmail } from '@/services/auth';
 import { addOrder } from '@/services/orders';
 import { createRemoteOrder } from '@/services/orderApi';
 import { createPaymentPreference } from '@/services/paymentsApi';
+import { quoteShipping, type ShippingQuote } from '@/services/shippingApi';
 import { createOrderCode } from '@/services/checkout';
 import { API_BASE_URL } from '@/services/api';
 import { formatPrice, getProductById } from '@/services/products';
 import type { Address } from '@/types/user';
 import type { Order, OrderPayment, OrderShipping } from '@/types/order';
-
-const shippingPrices: Record<OrderShipping, number> = {
-  standard: 0,
-  express: 39
-};
 
 function CardIcon() {
   return (
@@ -86,7 +82,7 @@ const emptyAddress: AddressForm = {
   phone: ''
 };
 
-function paymentLabel(payment: OrderPayment) {
+function paymentLabel(payment: string) {
   switch (payment) {
     case 'card': return 'Cartão';
     case 'mercado-pago': return 'Mercado Pago';
@@ -102,8 +98,11 @@ export function CheckoutPageClient() {
   const { notify } = useNotifications();
   const router = useRouter();
 
-  const [shipping, setShipping] = useState<OrderShipping>('standard');
-  const [payment, setPayment] = useState<OrderPayment>('card');
+  const [shipping, setShipping] = useState<OrderShipping>('');
+  const [shippingQuotes, setShippingQuotes] = useState<ShippingQuote[]>([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState('');
+  const [payment] = useState<OrderPayment>('mercado-pago');
   const [coupon, setCoupon] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const [appliedCouponPercent, setAppliedCouponPercent] = useState(0);
@@ -158,7 +157,8 @@ export function CheckoutPageClient() {
     : appliedCouponFixed > 0
       ? Math.min(subtotal, appliedCouponFixed)
       : 0;
-  const shippingPrice = shippingPrices[shipping];
+  const selectedShippingQuote = shippingQuotes.find(option => option.id === shipping) ?? null;
+  const shippingPrice = selectedShippingQuote?.price ?? 0;
   const total = Math.max(0, subtotal + shippingPrice - discount);
 
   const summaryItems = useMemo(
@@ -229,6 +229,45 @@ export function CheckoutPageClient() {
     }
   }
 
+  const refreshShippingQuotes = useCallback(async (postalCode = addressForm.postalCode) => {
+    const cep = postalCode.replace(/\D/g, '');
+    if (cep.length !== 8 || items.length === 0) {
+      setShippingQuotes([]);
+      setShipping('');
+      return;
+    }
+
+    setShippingLoading(true);
+    setShippingError('');
+    try {
+      const quotes = await quoteShipping(cep, items);
+      setShippingQuotes(quotes);
+      setShipping(current => quotes.some(quote => quote.id === current) ? current : quotes[0]?.id ?? '');
+      if (!quotes.length) setShippingError('Nenhuma opcao de frete disponivel para este CEP.');
+    } catch (error) {
+      setShippingQuotes([]);
+      setShipping('');
+      setShippingError(error instanceof Error ? error.message : 'Nao foi possivel calcular o frete.');
+    } finally {
+      setShippingLoading(false);
+    }
+  }, [addressForm.postalCode, items]);
+
+  useEffect(() => {
+    const cep = addressForm.postalCode.replace(/\D/g, '');
+    if (cep.length !== 8) {
+      setShippingQuotes([]);
+      setShipping('');
+      setShippingError('');
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      refreshShippingQuotes(addressForm.postalCode);
+    }, 450);
+    return () => window.clearTimeout(timeout);
+  }, [addressForm.postalCode, refreshShippingQuotes]);
+
   function buildAddress(): Address {
     const baseAddress = user?.addresses.find(item => item.id === selectedAddressId);
     return {
@@ -267,18 +306,27 @@ export function CheckoutPageClient() {
       return;
     }
 
+    if (!selectedShippingQuote) {
+      notify('Calcule e selecione uma opcao de frete para continuar.', 'error');
+      return;
+    }
+
     setPending(true);
 
     try {
       const address = buildAddress();
 
       if (user && saveAddress && selectedAddressId === 'new') {
-        const updated = upsertAddress({
-          ...address,
-          isDefault: user.addresses.length === 0
-        });
-        const savedAddress = updated.addresses.find(item => item.street === address.street && item.postalCode === address.postalCode);
-        if (savedAddress) address.id = savedAddress.id;
+        try {
+          const updated = upsertAddress({
+            ...address,
+            isDefault: user.addresses.length === 0
+          });
+          const savedAddress = updated.addresses.find(item => item.street === address.street && item.postalCode === address.postalCode);
+          if (savedAddress) address.id = savedAddress.id;
+        } catch {
+          // Conta real server-side ainda nao sincroniza enderecos no frontend local.
+        }
       }
 
       const fallbackOrder: Order = {
@@ -484,73 +532,49 @@ export function CheckoutPageClient() {
             <div className="form-block">
               <h3><span className="num">03</span> Método de Entrega</h3>
               <div className="sub">Todos os envios incluem documentação do acervo</div>
-              <div className="payments" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                {([
-                  ['standard', 'Padrão', '4-6 dias úteis', 'GRÁTIS'],
-                  ['express', 'Expresso', '1-2 dias úteis', formatPrice(shippingPrices.express)]
-                ] as const).map(([value, label, time, price]) => (
-                  <label className={`pay-method${shipping === value ? ' active' : ''}`} style={{ cursor: 'pointer' }} key={value}>
-                    <input
-                      type="radio"
-                      name="ship"
-                      value={value}
-                      checked={shipping === value}
-                      onChange={() => setShipping(value)}
-                      hidden
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                      <div style={{ textAlign: 'left' }}>
-                        <b style={{ fontFamily: 'var(--font-head)', fontSize: 13, display: 'block' }}>{label}</b>
-                        <span>{time}</span>
+              {shippingLoading ? <p className="meta">Calculando frete pelo Melhor Envio...</p> : null}
+              {shippingError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{shippingError}</p> : null}
+              {!shippingLoading && !shippingQuotes.length && !shippingError ? <p className="meta">Informe o CEP para calcular o frete real.</p> : null}
+              {shippingQuotes.length ? (
+                <div className="payments" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  {shippingQuotes.map(option => (
+                    <label className={`pay-method${shipping === option.id ? ' active' : ''}`} style={{ cursor: 'pointer' }} key={option.id}>
+                      <input
+                        type="radio"
+                        name="ship"
+                        value={option.id}
+                        checked={shipping === option.id}
+                        onChange={() => setShipping(option.id)}
+                        hidden
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                        <div style={{ textAlign: 'left' }}>
+                          <b style={{ fontFamily: 'var(--font-head)', fontSize: 13, display: 'block' }}>{option.name}</b>
+                          <span>{option.deliveryTime ? `${option.deliveryTime} dias uteis` : 'Prazo sob consulta'}</span>
+                        </div>
+                        <b className="mono" style={{ fontSize: 14 }}>{option.price ? formatPrice(option.price) : 'GRATIS'}</b>
                       </div>
-                      <b className="mono" style={{ color: value === 'standard' ? 'var(--red)' : undefined, fontSize: 14 }}>{price}</b>
-                    </div>
-                  </label>
-                ))}
-              </div>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <div className="form-block">
               <h3><span className="num">04</span> Pagamento</h3>
               <div className="sub">Transações protegidas. Mercado Pago preparado para integração no backend.</div>
 
-              <div className="payments">
-                {([
-                  ['card', 'Cartão', <CardIcon key="card" />],
-                  ['mercado-pago', 'Mercado Pago', <WalletIcon key="mp" />],
-                  ['pix', 'Pix', <PixIcon key="pix" />],
-                  ['boleto', 'Boleto', <BoletoIcon key="boleto" />]
-                ] as const).map(([value, label, icon]) => (
-                  <button
-                    type="button"
-                    className={`pay-method${payment === value ? ' active' : ''}`}
-                    key={value}
-                    onClick={() => setPayment(value)}
-                    aria-pressed={payment === value}
-                  >
-                    {icon}
-                    <span>{label}</span>
-                  </button>
-                ))}
+              <div className="payments" style={{ gridTemplateColumns: '1fr' }}>
+                <div className="pay-method active" aria-pressed="true">
+                  <WalletIcon />
+                  <span>Mercado Pago</span>
+                </div>
               </div>
 
-              {payment === 'card' ? (
-                <div style={{ marginTop: 24 }}>
-                  <div className="field-row">
-                    <div className="field"><label htmlFor="card-number">Número do Cartão</label><input id="card-number" type="text" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" /></div>
-                  </div>
-                  <div className="field-row cols-3">
-                    <div className="field"><label htmlFor="card-name">Titular</label><input id="card-name" type="text" autoComplete="cc-name" /></div>
-                    <div className="field"><label htmlFor="card-expiry">Validade</label><input id="card-expiry" type="text" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/AA" /></div>
-                    <div className="field"><label htmlFor="card-cvc">CVC</label><input id="card-cvc" type="text" inputMode="numeric" autoComplete="cc-csc" placeholder="000" /></div>
-                  </div>
-                </div>
-              ) : (
-                <div className="info-block" style={{ marginTop: 24 }}>
-                  <h2>{paymentLabel(payment)}</h2>
-                  <p>Após finalizar, você receberá as instruções de pagamento por email. O pedido é confirmado assim que o pagamento for identificado.</p>
-                </div>
-              )}
+              <div className="info-block" style={{ marginTop: 24 }}>
+                <h2>Mercado Pago</h2>
+                <p>Ao finalizar, voce sera redirecionado ao Mercado Pago para escolher Pix, cartao, boleto ou saldo com seguranca.</p>
+              </div>
             </div>
 
             <button type="submit" className="place-order-btn" disabled={pending}>
@@ -591,7 +615,7 @@ export function CheckoutPageClient() {
 
             <div className="summary-totals">
               <div className="row"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
-              <div className="row"><span>Frete</span><span style={{ color: shippingPrice ? 'var(--text)' : 'var(--red)' }}>{shippingPrice ? formatPrice(shippingPrice) : 'GRÁTIS'}</span></div>
+              <div className="row"><span>Frete</span><span style={{ color: selectedShippingQuote ? 'var(--text)' : 'var(--muted)' }}>{selectedShippingQuote ? (shippingPrice ? formatPrice(shippingPrice) : 'GRATIS') : 'Calcular'}</span></div>
               {discount > 0 ? <div className="row discount"><span>Desconto ({appliedCoupon})</span><span>−{formatPrice(discount)}</span></div> : null}
               <div className="row total"><span>Total</span><span>{formatPrice(total)}</span></div>
             </div>

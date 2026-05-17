@@ -6,17 +6,20 @@ const { subscribeNewsletter, unsubscribeNewsletter } = require('./db/newsletter'
 const { addCartItem, deleteCartItem, listCartItems, updateCartItem } = require('./db/cart');
 const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wishlist');
 const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orders');
+const { quoteCartShipping } = require('./db/shipping');
 const { getSessionId } = require('./db/session');
 const { createAuthHandler } = require('./routes/auth');
 const { createAdminHandler } = require('./routes/admin');
 const { createPaymentsHandler } = require('./routes/payments');
 const { sendOrderConfirmationIfNeeded } = require('./services/order-email');
 const { createEmailClient } = require('./services/email');
+const { createShippingClient } = require('./services/shipping');
 
 const PORT = Number(process.env.PORT || 3001);
 const ENV_PATH = path.join(__dirname, '..', '.env');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const NEWSLETTER_FILE = path.join(DATA_DIR, 'newsletter.json');
+const UPLOAD_PRODUCTS_DIR = path.join(__dirname, '..', 'uploads', 'products');
 
 function readEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
@@ -42,9 +45,10 @@ for (const [key, value] of Object.entries(appConfig)) {
 }
 
 const handleAuthRequest = createAuthHandler();
-const handleAdminRequest = createAdminHandler({ appConfig });
-const handlePaymentsRequest = createPaymentsHandler({ appConfig });
 const emailClient = createEmailClient(appConfig);
+const handleAdminRequest = createAdminHandler({ appConfig, uploadRoot: UPLOAD_PRODUCTS_DIR, emailService: emailClient });
+const handlePaymentsRequest = createPaymentsHandler({ appConfig });
+const shippingClient = createShippingClient(appConfig);
 
 // Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -112,6 +116,37 @@ function sendJson(res, statusCode, payload, corsOrigin) {
     ...corsHeaders
   });
   res.end(body);
+}
+
+function sendStaticUpload(req, res, pathname) {
+  const relativePath = decodeURIComponent(pathname.replace('/uploads/products/', ''));
+  if (!relativePath || relativePath.includes('..') || relativePath.includes('/') || relativePath.includes('\\')) {
+    sendJson(res, 400, { error: 'Arquivo invalido.' }, null);
+    return true;
+  }
+
+  const filePath = path.join(UPLOAD_PRODUCTS_DIR, relativePath);
+  if (!filePath.startsWith(UPLOAD_PRODUCTS_DIR)) {
+    sendJson(res, 400, { error: 'Arquivo invalido.' }, null);
+    return true;
+  }
+
+  if (!fs.existsSync(filePath)) {
+    sendJson(res, 404, { error: 'Arquivo nao encontrado.' }, null);
+    return true;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  const stat = fs.statSync(filePath);
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Content-Length': stat.size,
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  fs.createReadStream(filePath).pipe(res);
+  return true;
 }
 
 function parseJsonBody(body) {
@@ -253,6 +288,11 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname.startsWith('/uploads/products/') && req.method === 'GET') {
+    sendStaticUpload(req, res, url.pathname);
+    return;
+  }
+
   if (url.pathname === '/api/health' && req.method === 'GET') {
     sendJson(res, 200, { status: 'ok', service: 'velkor-backend' }, corsOrigin);
     return;
@@ -306,6 +346,29 @@ async function handleRequest(req, res) {
       sendJson(res, 200, { categories: await listCategories() }, corsOrigin);
     } catch {
       sendJson(res, 500, { error: 'Erro ao carregar categorias.' }, corsOrigin);
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/shipping/quote' && req.method === 'POST') {
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, 'shipping')) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
+    try {
+      const parsed = parseJsonBody(await readBody(req));
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error }, corsOrigin);
+        return;
+      }
+      sendJson(res, 200, await quoteCartShipping(parsed.value, shippingClient), corsOrigin);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, err.statusCode || 500, { error: err.statusCode ? err.message : 'Erro ao calcular frete.' }, corsOrigin);
     }
     return;
   }
@@ -461,7 +524,7 @@ async function handleRequest(req, res) {
         sendJson(res, 400, { error: parsed.error }, corsOrigin);
         return;
       }
-      const result = await createOrder(sessionId, parsed.value);
+      const result = await createOrder(sessionId, parsed.value, { shippingService: shippingClient });
       const email = await sendOrderConfirmationIfNeeded({ orderResult: result });
       if (email) result.email = email;
       sendJson(res, 201, result, corsOrigin);

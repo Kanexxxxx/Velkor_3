@@ -22,6 +22,7 @@ import {
   updateAdminProduct,
   updateAdminUser,
   updateNewsletterSubscriber,
+  uploadAdminProductImage,
   type AdminCoupon,
   type AdminRole,
   type AdminSettings,
@@ -158,6 +159,7 @@ export function AdminPageClient() {
   const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productSaving, setProductSaving] = useState(false);
+  const [productUploading, setProductUploading] = useState(false);
   const [productError, setProductError] = useState('');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
@@ -305,6 +307,31 @@ export function AdminPageClient() {
       setProductError(err instanceof Error ? err.message : 'Nao foi possivel salvar produto.');
     } finally {
       setProductSaving(false);
+    }
+  }
+
+  async function handleProductImageUpload(file: File | null) {
+    if (!file) return;
+    setProductUploading(true);
+    setProductError('');
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Nao foi possivel ler a imagem.'));
+        reader.readAsDataURL(file);
+      });
+      const uploaded = await uploadAdminProductImage({ filename: file.name, dataUrl });
+      const imageUrl = uploaded.url.startsWith('http') ? uploaded.url : `${window.location.origin}${uploaded.url}`;
+      setProductForm(current => ({
+        ...current,
+        image: imageUrl,
+        images: current.images ? `${current.images}, ${imageUrl}` : imageUrl,
+      }));
+    } catch (err) {
+      setProductError(err instanceof Error ? err.message : 'Nao foi possivel enviar imagem.');
+    } finally {
+      setProductUploading(false);
     }
   }
 
@@ -753,6 +780,14 @@ export function AdminPageClient() {
                       onChange={event => setProductForm(current => ({ ...current, image: event.target.value }))}
                       required
                     />
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={productUploading || apiMode !== 'real'}
+                      onChange={event => handleProductImageUpload(event.target.files?.[0] ?? null)}
+                      style={{ marginTop: 8 }}
+                    />
+                    {productUploading ? <span className="meta">Enviando imagem...</span> : null}
                   </div>
                   <div className="field">
                     <label htmlFor="admin-product-images">Galeria</label>

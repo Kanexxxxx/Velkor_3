@@ -33,6 +33,7 @@ function toUser(user: AuthApiUser): User {
     id: user.id,
     name: user.name || user.email.split('@')[0],
     email: user.email,
+    emailVerified: user.emailVerified,
     createdAt: new Date().toISOString(),
     addresses: [],
   };
@@ -128,6 +129,10 @@ export async function requestPasswordReset(email: string) {
     method: 'POST',
     body: JSON.stringify({ email }),
   });
+}
+
+export async function requestEmailVerification() {
+  await request<{ ok: true }>('/email-verification/request', { method: 'POST' });
 }
 
 export async function confirmPasswordReset(token: string, newPassword: string) {

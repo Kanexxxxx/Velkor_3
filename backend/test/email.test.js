@@ -16,8 +16,8 @@ test('email service uses safe dev mode when SMTP is not configured', async () =>
   assert.deepEqual(result, { sent: false, mode: 'dev', template: 'test', to: 'customer@example.com' });
 });
 
-test('email templates build password reset and order confirmation content', () => {
-  const { passwordResetTemplate, orderConfirmationTemplate } = require('../src/services/email-templates');
+test('email templates build password reset, order confirmation, and shipped content', () => {
+  const { passwordResetTemplate, orderConfirmationTemplate, orderShippedTemplate } = require('../src/services/email-templates');
 
   const reset = passwordResetTemplate({ resetUrl: 'https://velkor.test/reset?token=raw-token' });
   const order = orderConfirmationTemplate({
@@ -27,11 +27,15 @@ test('email templates build password reset and order confirmation content', () =
       items: [{ productId: 'v01', quantity: 2 }],
     },
   });
+  const shipped = orderShippedTemplate({ order: { id: 'ord_1' } });
 
   assert.match(reset.subject, /redefinir sua senha/i);
   assert.match(reset.text, /https:\/\/velkor\.test\/reset\?token=raw-token/);
   assert.match(order.subject, /pedido/i);
   assert.match(order.text, /ord_1/);
+  assert.match(order.text, /parabens/i);
+  assert.match(shipped.subject, /enviado/i);
+  assert.match(shipped.text, /ord_1/);
 });
 
 test('order email helper sends confirmation only when an order exists', async () => {
@@ -50,6 +54,30 @@ test('order email helper sends confirmation only when an order exists', async ()
   });
   const skipped = await sendOrderConfirmationIfNeeded({
     orderResult: { order: null, storage: 'demo' },
+    emailService,
+  });
+
+  assert.equal(result.mode, 'dev');
+  assert.equal(sent[0].to, 'buyer@example.com');
+  assert.equal(skipped, null);
+});
+
+test('order email helper sends shipped email only for fulfilled orders', async () => {
+  const { sendOrderShippedIfNeeded } = require('../src/services/order-email');
+  const sent = [];
+  const emailService = {
+    sendOrderShipped: async payload => {
+      sent.push(payload);
+      return { sent: false, mode: 'dev' };
+    },
+  };
+
+  const result = await sendOrderShippedIfNeeded({
+    orderResult: { order: { id: 'ord_3', status: 'shipped', email: 'buyer@example.com' }, storage: 'database' },
+    emailService,
+  });
+  const skipped = await sendOrderShippedIfNeeded({
+    orderResult: { order: { id: 'ord_4', status: 'paid', email: 'buyer@example.com' }, storage: 'database' },
     emailService,
   });
 
