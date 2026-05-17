@@ -8,6 +8,7 @@ const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wish
 const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orders');
 const { getSessionId } = require('./db/session');
 const { createAuthHandler } = require('./routes/auth');
+const { createAdminHandler } = require('./routes/admin');
 
 const PORT = Number(process.env.PORT || 3001);
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -38,6 +39,7 @@ for (const [key, value] of Object.entries(appConfig)) {
 }
 
 const handleAuthRequest = createAuthHandler();
+const handleAdminRequest = createAdminHandler({ appConfig });
 
 // Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -255,6 +257,7 @@ async function handleRequest(req, res) {
   }
 
   if (await handleAuthRequest(req, res, corsOrigin)) return;
+  if (await handleAdminRequest(req, res, corsOrigin)) return;
 
   if (url.pathname === '/api/products' && req.method === 'GET') {
     try {
