@@ -111,6 +111,22 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname === '/api/admin/products' && req.method === 'GET') {
+        sendJson(res, 200, await repo.listAdminProducts(), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname === '/api/admin/products' && req.method === 'POST') {
+        sendJson(res, 201, await repo.createProduct(await readJson(req), adminUserId), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/admin/products/') && req.method === 'PATCH') {
+        const id = extractId(url.pathname, '/api/admin/products/');
+        sendJson(res, 200, await repo.updateProduct(id, await readJson(req), adminUserId), corsOrigin);
+        return true;
+      }
+
       if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/status') && req.method === 'PATCH') {
         const id = extractId(url.pathname, '/api/admin/orders/', '/status');
         const payload = await readJson(req);

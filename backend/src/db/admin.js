@@ -11,6 +11,20 @@ function normalizeText(value, max = 120) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function mapProductWriteError(error) {
+  if (error?.code === 'P2002') {
+    const conflict = new Error('Produto com ID ou slug ja cadastrado.');
+    conflict.statusCode = 409;
+    return conflict;
+  }
+  if (error?.code === 'P2025') {
+    const missing = new Error('Produto nao encontrado.');
+    missing.statusCode = 404;
+    return missing;
+  }
+  return error;
+}
+
 function toAdminUser(user) {
   if (!user) return null;
   return {
@@ -52,6 +66,156 @@ function toNewsletterSubscriber(subscriber) {
     subscribedAt: subscriber.subscribedAt instanceof Date ? subscriber.subscribedAt.toISOString() : subscriber.subscribedAt,
     updatedAt: subscriber.updatedAt instanceof Date ? subscriber.updatedAt.toISOString() : subscriber.updatedAt,
   };
+}
+
+function toAdminProduct(product) {
+  if (!product) return null;
+  return {
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    category: product.category?.slug || product.category,
+    categoryId: product.categoryId,
+    brand: product.brand,
+    price: product.priceCents / 100,
+    oldPrice: product.oldPriceCents ? product.oldPriceCents / 100 : null,
+    rating: product.rating,
+    reviews: product.reviews,
+    badge: product.badge || null,
+    discount: product.discount ?? null,
+    colors: Array.isArray(product.colors) ? product.colors : [],
+    image: product.image,
+    images: Array.isArray(product.images) ? product.images : [],
+    sizes: Array.isArray(product.sizes) ? product.sizes : [],
+    tag: product.tag,
+    active: Boolean(product.active),
+    createdAt: product.createdAt instanceof Date ? product.createdAt.toISOString() : product.createdAt,
+    updatedAt: product.updatedAt instanceof Date ? product.updatedAt.toISOString() : product.updatedAt,
+  };
+}
+
+function parseList(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => normalizeText(item, 300)).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value.split(',').map(item => normalizeText(item, 300)).filter(Boolean);
+  }
+  return [];
+}
+
+function validateProductPayload(payload, { partial = false } = {}) {
+  if (!payload || typeof payload !== 'object') return { error: 'Payload invalido.' };
+
+  const has = key => Object.prototype.hasOwnProperty.call(payload, key);
+  const data = {};
+
+  if (!partial || has('id')) {
+    const id = normalizeText(payload.id, 80).toLowerCase();
+    if (!/^[a-z0-9_-]{2,80}$/.test(id)) return { error: 'ID do produto invalido.' };
+    data.id = id;
+  }
+
+  if (!partial || has('slug')) {
+    const slugSource = has('slug') ? payload.slug : payload.id;
+    const slug = normalizeText(slugSource, 100).toLowerCase();
+    if (!/^[a-z0-9_-]{2,100}$/.test(slug)) return { error: 'Slug do produto invalido.' };
+    data.slug = slug;
+  }
+
+  if (!partial || has('name')) {
+    const name = normalizeText(payload.name, 180);
+    if (name.length < 2) return { error: 'Nome do produto invalido.' };
+    data.name = name;
+  }
+
+  if (!partial || has('category')) {
+    const category = normalizeText(payload.category, 80).toLowerCase();
+    if (!/^[a-z0-9_-]{2,80}$/.test(category)) return { error: 'Categoria invalida.' };
+    data.categorySlug = category;
+  }
+
+  if (!partial || has('brand')) {
+    const brand = normalizeText(payload.brand, 120);
+    if (brand.length < 2) return { error: 'Marca invalida.' };
+    data.brand = brand;
+  }
+
+  if (!partial || has('price')) {
+    const price = Number(payload.price);
+    if (!Number.isFinite(price) || price <= 0) return { error: 'Preco invalido.' };
+    data.priceCents = Math.round(price * 100);
+  }
+
+  if (has('oldPrice')) {
+    if (payload.oldPrice === '' || payload.oldPrice === null || payload.oldPrice === undefined) data.oldPriceCents = null;
+    else {
+      const oldPrice = Number(payload.oldPrice);
+      if (!Number.isFinite(oldPrice) || oldPrice <= 0) return { error: 'Preco antigo invalido.' };
+      data.oldPriceCents = Math.round(oldPrice * 100);
+    }
+  } else if (!partial) {
+    data.oldPriceCents = null;
+  }
+
+  if (has('rating')) {
+    const rating = Number(payload.rating);
+    if (!Number.isFinite(rating) || rating < 0 || rating > 5) return { error: 'Avaliacao invalida.' };
+    data.rating = rating;
+  } else if (!partial) {
+    data.rating = 0;
+  }
+
+  if (has('reviews')) {
+    const reviews = Number(payload.reviews);
+    if (!Number.isInteger(reviews) || reviews < 0) return { error: 'Numero de reviews invalido.' };
+    data.reviews = reviews;
+  } else if (!partial) {
+    data.reviews = 0;
+  }
+
+  if (has('badge')) data.badge = normalizeText(payload.badge, 40) || null;
+
+  if (has('discount')) {
+    if (payload.discount === '' || payload.discount === null || payload.discount === undefined) data.discount = null;
+    else {
+      const discount = Number(payload.discount);
+      if (!Number.isInteger(discount) || discount < 0 || discount > 100) return { error: 'Desconto invalido.' };
+      data.discount = discount;
+    }
+  }
+
+  if (!partial || has('colors')) {
+    const colors = parseList(payload.colors);
+    if (!colors.length) return { error: 'Informe ao menos uma cor.' };
+    data.colors = colors;
+  }
+
+  if (!partial || has('image')) {
+    const image = normalizeText(payload.image, 500);
+    if (!image) return { error: 'Imagem principal invalida.' };
+    data.image = image;
+  }
+
+  if (has('images')) data.images = parseList(payload.images);
+  else if (!partial) data.images = [];
+
+  if (!partial || has('sizes')) {
+    const sizes = parseList(payload.sizes);
+    if (!sizes.length) return { error: 'Informe ao menos um tamanho.' };
+    data.sizes = sizes;
+  }
+
+  if (!partial || has('tag')) {
+    const tag = normalizeText(payload.tag, 40).toLowerCase();
+    if (!tag) return { error: 'Tag invalida.' };
+    data.tag = tag;
+  }
+
+  if (has('active')) data.active = Boolean(payload.active);
+  else if (!partial) data.active = true;
+
+  return { value: data };
 }
 
 function validateCouponPayload(payload) {
@@ -189,6 +353,82 @@ async function listCoupons() {
   return { coupons: coupons.map(toAdminCoupon), storage: 'database' };
 }
 
+async function findCategoryBySlug(txOrPrisma, slug) {
+  const category = await txOrPrisma.category.findUnique({ where: { slug } });
+  if (!category) {
+    const error = new Error('Categoria invalida.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return category;
+}
+
+async function listAdminProducts() {
+  const prisma = getPrisma();
+  if (!prisma) return { products: [], storage: 'demo' };
+  const products = await prisma.product.findMany({
+    include: { category: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+  return { products: products.map(toAdminProduct), storage: 'database' };
+}
+
+async function createProduct(payload, adminUserId) {
+  const prisma = getPrisma();
+  if (!prisma) return { product: null, storage: 'demo' };
+  const parsed = validateProductPayload(payload);
+  if (parsed.error) {
+    const error = new Error(parsed.error);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const product = await prisma.$transaction(async tx => {
+    const category = await findCategoryBySlug(tx, parsed.value.categorySlug);
+    const { categorySlug, ...data } = parsed.value;
+    const created = await tx.product.create({
+      data: { ...data, categoryId: category.id },
+      include: { category: true },
+    });
+    await logAdminAction(tx, { adminUserId, action: 'product.create', targetType: 'product', targetId: created.id, metadata: { name: created.name } });
+    return created;
+  }).catch(error => {
+    throw mapProductWriteError(error);
+  });
+  return { product: toAdminProduct(product), storage: 'database' };
+}
+
+async function updateProduct(id, payload, adminUserId) {
+  const prisma = getPrisma();
+  if (!prisma) return { product: null, storage: 'demo' };
+  const parsed = validateProductPayload(payload, { partial: true });
+  if (parsed.error) {
+    const error = new Error(parsed.error);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const product = await prisma.$transaction(async tx => {
+    const data = { ...parsed.value };
+    if (data.categorySlug) {
+      const category = await findCategoryBySlug(tx, data.categorySlug);
+      data.categoryId = category.id;
+      delete data.categorySlug;
+    }
+    delete data.id;
+    const updated = await tx.product.update({
+      where: { id },
+      data,
+      include: { category: true },
+    });
+    await logAdminAction(tx, { adminUserId, action: 'product.update', targetType: 'product', targetId: id, metadata: data });
+    return updated;
+  }).catch(error => {
+    throw mapProductWriteError(error);
+  });
+  return { product: toAdminProduct(product), storage: 'database' };
+}
+
 async function createCoupon(payload, adminUserId) {
   const prisma = getPrisma();
   if (!prisma) return { coupon: null, storage: 'demo' };
@@ -248,15 +488,20 @@ async function updateNewsletterSubscriber(id, patch, adminUserId) {
 
 module.exports = {
   createCoupon,
+  createProduct,
   listAdminOrders,
+  listAdminProducts,
   listAdminUsers,
   listCoupons,
   listNewsletterSubscribers,
   logAdminAction,
   toAdminUser,
+  toAdminProduct,
   updateAdminUser,
   updateCoupon,
   updateNewsletterSubscriber,
   updateOrderStatus,
+  updateProduct,
   validateCouponPayload,
+  validateProductPayload,
 };

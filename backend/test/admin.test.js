@@ -41,6 +41,37 @@ test('admin normalizes and validates coupon payloads', () => {
   assert.equal(validateCouponPayload({ code: 'ABC', discountType: 'PERCENT', discountValue: 101 }).error, 'Cupom percentual invalido.');
 });
 
+test('admin normalizes and validates product payloads', () => {
+  const { validateProductPayload } = require('../src/db/admin');
+
+  const parsed = validateProductPayload({
+    id: ' V99 ',
+    slug: 'produto-real',
+    name: ' Produto Real ',
+    category: 'sneakers',
+    brand: 'VOLKERR',
+    price: 299.9,
+    oldPrice: '',
+    colors: '#000000, #ffffff',
+    image: 'https://example.com/produto.jpg',
+    images: 'https://example.com/a.jpg, https://example.com/b.jpg',
+    sizes: '39, 40, 41',
+    tag: 'new',
+    active: false,
+  });
+
+  assert.equal(parsed.error, undefined);
+  assert.equal(parsed.value.id, 'v99');
+  assert.equal(parsed.value.slug, 'produto-real');
+  assert.equal(parsed.value.priceCents, 29990);
+  assert.deepEqual(parsed.value.colors, ['#000000', '#ffffff']);
+  assert.deepEqual(parsed.value.sizes, ['39', '40', '41']);
+  assert.equal(parsed.value.active, false);
+
+  assert.equal(validateProductPayload({ id: 'x', name: 'Bad', category: 'sneakers', brand: 'B', price: 0, image: 'x', sizes: 'M', colors: '#000', tag: 'new' }).error, 'ID do produto invalido.');
+  assert.equal(validateProductPayload({ id: 'abc', name: 'Bad', category: '!', brand: 'Brand', price: 10, image: 'x', sizes: 'M', colors: '#000', tag: 'new' }).error, 'Categoria invalida.');
+});
+
 test('admin maps public users without password hashes', () => {
   const { toAdminUser } = require('../src/db/admin');
   const user = toAdminUser({
@@ -98,6 +129,34 @@ test('admin route updates order status for admins', async () => {
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(statusInput, { id: 'order_1', status: 'paid', adminUserId: 'adm_2' });
+});
+
+test('admin route creates and updates products for admins', async () => {
+  const { createAdminHandler } = require('../src/routes/admin');
+  const createRes = makeRes();
+  const updateRes = makeRes();
+  const calls = [];
+  const handler = createAdminHandler({
+    authRepo: { findSessionUser: async () => ({ user: { id: 'adm_products', role: 'ADMIN' } }) },
+    appConfig: {},
+    repo: {
+      createProduct: async (payload, adminUserId) => {
+        calls.push({ type: 'create', payload, adminUserId });
+        return { product: { id: payload.id, name: payload.name, active: true }, storage: 'database' };
+      },
+      updateProduct: async (id, payload, adminUserId) => {
+        calls.push({ type: 'update', id, payload, adminUserId });
+        return { product: { id, name: payload.name, active: payload.active }, storage: 'database' };
+      },
+    },
+  });
+
+  assert.equal(await handler(makeReq({ method: 'POST', url: '/api/admin/products', body: { id: 'p1', name: 'Produto 1' } }), createRes, null), true);
+  assert.equal(await handler(makeReq({ method: 'PATCH', url: '/api/admin/products/p1', body: { name: 'Produto Editado', active: false } }), updateRes, null), true);
+
+  assert.equal(createRes.statusCode, 201);
+  assert.equal(updateRes.statusCode, 200);
+  assert.deepEqual(calls.map(call => call.adminUserId), ['adm_products', 'adm_products']);
 });
 
 test('legacy admin unlock returns gone when disabled', async () => {
