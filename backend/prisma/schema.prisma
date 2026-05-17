@@ -36,6 +36,7 @@ model User {
   passwordHash String?
   role         UserRole        @default(CUSTOMER)
   demoUser     Boolean         @default(false)
+  emailVerified Boolean        @default(false)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   addresses    Address[]
@@ -43,6 +44,34 @@ model User {
   wishlistItems WishlistItem[]
   orders       Order[]
   auditLogs    AdminAuditLog[]
+  sessions     Session[]
+  resetTokens  PasswordResetToken[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Category {
@@ -117,14 +146,19 @@ model WishlistItem {
 model Order {
   id             String      @id @default(uuid())
   userId         String?
+  sessionId      String?
   user           User?       @relation(fields: [userId], references: [id])
   email          String
+  contactName    String?
+  contactPhone   String?
   status         OrderStatus @default(PENDING)
   subtotalCents  Int
   discountCents  Int         @default(0)
   shippingCents  Int         @default(0)
   totalCents     Int
   couponCode     String?
+  paymentMethod  String?
+  shippingMethod String?
   shippingAddressId String?
   shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
   items          OrderItem[]
@@ -132,6 +166,7 @@ model Order {
   updatedAt      DateTime    @updatedAt
 
   @@index([userId])
+  @@index([sessionId])
   @@index([email])
   @@index([status])
 }

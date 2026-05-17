@@ -10,6 +10,7 @@ import { useNotifications } from '@/components/notifications/NotificationProvide
 import { trackEvent } from '@/components/Analytics';
 import { isValidEmail } from '@/services/auth';
 import { addOrder } from '@/services/orders';
+import { createRemoteOrder } from '@/services/orderApi';
 import { createOrderCode } from '@/services/checkout';
 import { API_BASE_URL } from '@/services/api';
 import { formatPrice, getProductById } from '@/services/products';
@@ -105,6 +106,7 @@ export function CheckoutPageClient() {
   const [coupon, setCoupon] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState('');
   const [appliedCouponPercent, setAppliedCouponPercent] = useState(0);
+  const [appliedCouponFixed, setAppliedCouponFixed] = useState(0); // em reais
   const [couponLoading, setCouponLoading] = useState(false);
   const [orderCode, setOrderCode] = useState('');
   const [pending, setPending] = useState(false);
@@ -150,7 +152,11 @@ export function CheckoutPageClient() {
   }, [selectedAddressId, user]);
 
   const subtotal = summary.subtotal;
-  const discount = appliedCouponPercent > 0 ? Math.round(subtotal * appliedCouponPercent / 100) : 0;
+  const discount = appliedCouponPercent > 0
+    ? Math.round(subtotal * appliedCouponPercent / 100)
+    : appliedCouponFixed > 0
+      ? Math.min(subtotal, appliedCouponFixed)
+      : 0;
   const shippingPrice = shippingPrices[shipping];
   const total = Math.max(0, subtotal + shippingPrice - discount);
 
@@ -169,14 +175,19 @@ export function CheckoutPageClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code })
       });
-      const data = await res.json() as { valid: boolean; discountPercent?: number; code?: string };
-      if (data.valid && data.discountPercent) {
+      const data = await res.json() as { valid: boolean; discountPercent?: number; discountFixed?: number; code?: string };
+      if (data.valid && (data.discountPercent || data.discountFixed)) {
         setAppliedCoupon(data.code ?? code);
-        setAppliedCouponPercent(data.discountPercent);
-        notify(`Cupom aplicado: ${data.discountPercent}% de desconto.`, 'success');
+        setAppliedCouponPercent(data.discountPercent ?? 0);
+        setAppliedCouponFixed(data.discountFixed ?? 0);
+        const msg = data.discountPercent
+          ? `Cupom aplicado: ${data.discountPercent}% de desconto.`
+          : `Cupom aplicado: R$ ${(data.discountFixed ?? 0).toFixed(2)} de desconto.`;
+        notify(msg, 'success');
       } else {
         setAppliedCoupon('');
         setAppliedCouponPercent(0);
+        setAppliedCouponFixed(0);
         notify('Cupom inválido ou expirado.', 'error');
       }
     } catch {
@@ -189,6 +200,7 @@ export function CheckoutPageClient() {
   function removeCoupon() {
     setAppliedCoupon('');
     setAppliedCouponPercent(0);
+    setAppliedCouponFixed(0);
     setCoupon('');
     notify('Cupom removido.', 'info');
   }
@@ -268,11 +280,11 @@ export function CheckoutPageClient() {
         if (savedAddress) address.id = savedAddress.id;
       }
 
-      const order: Order = {
+      const fallbackOrder: Order = {
         id: orderCode,
         userId: user?.id,
         items,
-        status: payment === 'card' ? 'paid' : 'pending',
+        status: 'pending',
         subtotal,
         shippingCost: shippingPrice,
         tax: 0,
@@ -286,13 +298,29 @@ export function CheckoutPageClient() {
         createdAt: new Date().toISOString()
       };
 
-      addOrder(order);
-      trackEvent('Purchase', { value: total, currency: 'BRL', order_id: orderCode });
+      let order = fallbackOrder;
+      let savedRemotely = false;
+      try {
+        order = await createRemoteOrder({
+          items,
+          contact: { name: contact.name, email: contact.email, phone: contact.phone || undefined },
+          address,
+          coupon: appliedCoupon || undefined,
+          payment,
+          shipping
+        });
+        savedRemotely = true;
+      } catch {
+        addOrder(fallbackOrder);
+      }
+
+      if (savedRemotely) addOrder(order);
+      trackEvent('Purchase', { value: order.total, currency: 'BRL', order_id: order.id });
       clearCart();
 
-      const message = payment === 'card'
-        ? `Pedido ${order.id} confirmado. Bem-vindo ao acervo Velkor.`
-        : `Pedido ${order.id} criado. Instruções de pagamento enviadas por email.`;
+      const message = savedRemotely
+        ? `Pedido criado com sucesso. Aguardando pagamento.`
+        : `Pedido ${order.id} salvo localmente. Sincronize quando o servidor estiver disponível.`;
       notify(message, 'success');
 
       router.push(user ? '/account?tab=orders' : '/');
@@ -447,7 +475,7 @@ export function CheckoutPageClient() {
               <div className="payments" style={{ gridTemplateColumns: '1fr 1fr' }}>
                 {([
                   ['standard', 'Padrão', '4-6 dias úteis', 'GRÁTIS'],
-                  ['express', 'Expresso', '1-2 dias úteis', '$24']
+                  ['express', 'Expresso', '1-2 dias úteis', formatPrice(shippingPrices.express)]
                 ] as const).map(([value, label, time, price]) => (
                   <label className={`pay-method${shipping === value ? ' active' : ''}`} style={{ cursor: 'pointer' }} key={value}>
                     <input

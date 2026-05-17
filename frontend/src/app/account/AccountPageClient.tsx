@@ -8,7 +8,7 @@ import { useNotifications } from '@/components/notifications/NotificationProvide
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
 import { getInfoHref } from '@/services/infoPages';
-import { ordersForUser, orderStatusLabels } from '@/services/orders';
+import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
 import { formatPrice, getProductById } from '@/services/products';
 import type { Address } from '@/types/user';
 import type { Order } from '@/types/order';
@@ -268,11 +268,21 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
   const { user } = useAuth();
   const { productIds } = useWishlist();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-    setOrders(ordersForUser(user.id));
-  }, [user, tab]);
+    let active = true;
+    setOrdersLoading(true);
+    setOrdersError(null);
+    loadOrdersForUser(user.id)
+      .then(nextOrders => { if (active) setOrders(nextOrders); })
+      .catch(() => { if (active) setOrdersError('Não foi possível carregar os pedidos.'); })
+      .finally(() => { if (active) setOrdersLoading(false); });
+    return () => { active = false; };
+  }, [user, tab, ordersRefreshKey]);
 
   if (!user) return null;
 
@@ -340,7 +350,14 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
 
           <div className="account-content">
             {tab === 'profile' ? <ProfilePanel /> : null}
-            {tab === 'orders' ? <OrdersPanel orders={orders} /> : null}
+            {tab === 'orders' ? (
+              <OrdersPanel
+                orders={orders}
+                loading={ordersLoading}
+                error={ordersError}
+                onRetry={() => setOrdersRefreshKey(k => k + 1)}
+              />
+            ) : null}
             {tab === 'addresses' ? <AddressesPanel /> : null}
             {tab === 'security' ? <SecurityPanel /> : null}
           </div>
@@ -400,7 +417,42 @@ function ProfilePanel() {
   );
 }
 
-function OrdersPanel({ orders }: { orders: Order[] }) {
+function OrdersPanel({ orders, loading, error, onRetry }: {
+  orders: Order[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (loading) {
+    return (
+      <article className="account-panel">
+        <header>
+          <h2>Meus pedidos</h2>
+          <p>Histórico completo, status atual e detalhes de cada compra.</p>
+        </header>
+        <div className="empty-state" style={{ opacity: 0.6 }}>
+          <p>Carregando pedidos...</p>
+        </div>
+      </article>
+    );
+  }
+
+  if (error) {
+    return (
+      <article className="account-panel">
+        <header>
+          <h2>Meus pedidos</h2>
+          <p>Histórico completo, status atual e detalhes de cada compra.</p>
+        </header>
+        <div className="empty-state">
+          <h2>Não foi possível carregar.</h2>
+          <p>{error}</p>
+          <button type="button" className="btn btn-primary" onClick={onRetry}>Tentar novamente</button>
+        </div>
+      </article>
+    );
+  }
+
   if (orders.length === 0) {
     return (
       <article className="account-panel">
