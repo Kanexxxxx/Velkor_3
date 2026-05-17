@@ -10,8 +10,32 @@ export interface AdminUser {
   role: AdminRole;
   emailVerified: boolean;
   demoUser: boolean;
+  addresses: AdminAddress[];
+  orders: AdminOrderSummary[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminAddress {
+  id: string;
+  recipient: string;
+  street: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrderSummary {
+  id: string;
+  status: Order['status'];
+  total: number;
+  createdAt: string;
 }
 
 export interface AdminCoupon {
@@ -140,7 +164,7 @@ export async function fetchAdminUsers() {
   return data.users ?? [];
 }
 
-export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser, 'role' | 'emailVerified'>>) {
+export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser, 'name' | 'email' | 'role' | 'emailVerified'>>) {
   const data = await request<{ user: AdminUser }>(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),

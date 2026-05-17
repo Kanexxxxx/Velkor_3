@@ -90,6 +90,54 @@ test('admin maps public users without password hashes', () => {
   assert.equal(user.email, 'a@b.com');
 });
 
+test('admin maps customer details with addresses and order summaries', () => {
+  const { toAdminUser, validateAdminUserPatch } = require('../src/db/admin');
+  const user = toAdminUser({
+    id: 'u2',
+    email: 'cliente@example.com',
+    name: 'Cliente',
+    role: 'CUSTOMER',
+    emailVerified: false,
+    addresses: [{
+      id: 'addr_1',
+      fullName: 'Cliente Silva',
+      phone: '+55 16 99999-9999',
+      postalCode: '14000-000',
+      street: 'Rua A',
+      number: '123',
+      complement: 'Casa',
+      neighborhood: 'Centro',
+      city: 'Ribeirao Preto',
+      state: 'SP',
+      country: 'BR',
+      createdAt: new Date('2026-01-03T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-04T00:00:00.000Z'),
+    }],
+    orders: [{
+      id: 'ord_1',
+      status: 'PAID',
+      totalCents: 15990,
+      createdAt: new Date('2026-01-05T00:00:00.000Z'),
+    }],
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+  });
+
+  assert.equal(user.passwordHash, undefined);
+  assert.equal(user.addresses[0].street, 'Rua A, 123');
+  assert.equal(user.addresses[0].region, 'SP');
+  assert.equal(user.orders[0].status, 'paid');
+  assert.equal(user.orders[0].total, 159.9);
+
+  assert.deepEqual(validateAdminUserPatch({ name: ' Novo Nome ', email: 'NOVO@EXAMPLE.COM', role: 'ADMIN', emailVerified: true }).value, {
+    name: 'Novo Nome',
+    email: 'novo@example.com',
+    role: 'ADMIN',
+    emailVerified: true,
+  });
+  assert.equal(validateAdminUserPatch({ email: 'email-invalido' }).error, 'Email invalido.');
+});
+
 test('admin route rejects customers and returns admin profile for admins', async () => {
   const { createAdminHandler } = require('../src/routes/admin');
   const customerRes = makeRes();

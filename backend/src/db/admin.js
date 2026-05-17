@@ -11,6 +11,14 @@ function normalizeText(value, max = 120) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function isValidEmail(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function toIso(value) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 function mapProductWriteError(error) {
   if (error?.code === 'P2002') {
     const conflict = new Error('Produto com ID ou slug ja cadastrado.');
@@ -25,6 +33,48 @@ function mapProductWriteError(error) {
   return error;
 }
 
+function mapUserWriteError(error) {
+  if (error?.code === 'P2002') {
+    const conflict = new Error('Email ja cadastrado em outro cliente.');
+    conflict.statusCode = 409;
+    return conflict;
+  }
+  if (error?.code === 'P2025') {
+    const missing = new Error('Cliente nao encontrado.');
+    missing.statusCode = 404;
+    return missing;
+  }
+  return error;
+}
+
+function toAdminAddress(address) {
+  if (!address) return null;
+  return {
+    id: address.id,
+    recipient: address.fullName || '',
+    street: [address.street, address.number].filter(Boolean).join(', '),
+    complement: address.complement || '',
+    neighborhood: address.neighborhood || '',
+    city: address.city || '',
+    region: address.state || '',
+    postalCode: address.postalCode || '',
+    country: address.country || 'BR',
+    phone: address.phone || '',
+    createdAt: toIso(address.createdAt),
+    updatedAt: toIso(address.updatedAt),
+  };
+}
+
+function toAdminOrderSummary(order) {
+  if (!order) return null;
+  return {
+    id: order.id,
+    status: order.status === 'PENDING' ? 'pending' : String(order.status || '').toLowerCase(),
+    total: Number(order.totalCents || 0) / 100,
+    createdAt: toIso(order.createdAt),
+  };
+}
+
 function toAdminUser(user) {
   if (!user) return null;
   return {
@@ -34,8 +84,10 @@ function toAdminUser(user) {
     role: user.role,
     emailVerified: Boolean(user.emailVerified),
     demoUser: Boolean(user.demoUser),
-    createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
-    updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : user.updatedAt,
+    addresses: Array.isArray(user.addresses) ? user.addresses.map(toAdminAddress).filter(Boolean) : [],
+    orders: Array.isArray(user.orders) ? user.orders.map(toAdminOrderSummary).filter(Boolean) : [],
+    createdAt: toIso(user.createdAt),
+    updatedAt: toIso(user.updatedAt),
   };
 }
 
@@ -218,6 +270,30 @@ function validateProductPayload(payload, { partial = false } = {}) {
   return { value: data };
 }
 
+function validateAdminUserPatch(payload) {
+  if (!payload || typeof payload !== 'object') return { error: 'Payload invalido.' };
+  const data = {};
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'name')) {
+    const name = normalizeText(payload.name, 120);
+    data.name = name || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'email')) {
+    const email = normalizeText(payload.email, 160).toLowerCase();
+    if (!isValidEmail(email)) return { error: 'Email invalido.' };
+    data.email = email;
+  }
+
+  if (payload.role === 'ADMIN' || payload.role === 'CUSTOMER') data.role = payload.role;
+  else if (Object.prototype.hasOwnProperty.call(payload, 'role')) return { error: 'Role invalida.' };
+
+  if (typeof payload.emailVerified === 'boolean') data.emailVerified = payload.emailVerified;
+  else if (Object.prototype.hasOwnProperty.call(payload, 'emailVerified')) return { error: 'Status de email invalido.' };
+
+  return { value: data };
+}
+
 function validateCouponPayload(payload) {
   if (!payload || typeof payload !== 'object') return { error: 'Payload invalido.' };
 
@@ -326,22 +402,39 @@ async function updateOrderStatus(id, status, adminUserId) {
 async function listAdminUsers() {
   const prisma = getPrisma();
   if (!prisma) return { users: [], storage: 'demo' };
-  const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+  const users = await prisma.user.findMany({
+    include: {
+      addresses: { orderBy: { updatedAt: 'desc' } },
+      orders: { orderBy: { createdAt: 'desc' }, take: 6 },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
   return { users: users.map(toAdminUser), storage: 'database' };
 }
 
 async function updateAdminUser(id, patch, adminUserId) {
   const prisma = getPrisma();
   if (!prisma) return { user: null, storage: 'demo' };
-
-  const data = {};
-  if (patch.role === 'ADMIN' || patch.role === 'CUSTOMER') data.role = patch.role;
-  if (typeof patch.emailVerified === 'boolean') data.emailVerified = patch.emailVerified;
+  const parsed = validateAdminUserPatch(patch);
+  if (parsed.error) {
+    const error = new Error(parsed.error);
+    error.statusCode = 400;
+    throw error;
+  }
 
   const user = await prisma.$transaction(async tx => {
-    const updated = await tx.user.update({ where: { id }, data });
-    await logAdminAction(tx, { adminUserId, action: 'user.update', targetType: 'user', targetId: id, metadata: data });
+    const updated = await tx.user.update({
+      where: { id },
+      data: parsed.value,
+      include: {
+        addresses: { orderBy: { updatedAt: 'desc' } },
+        orders: { orderBy: { createdAt: 'desc' }, take: 6 },
+      },
+    });
+    await logAdminAction(tx, { adminUserId, action: 'user.update', targetType: 'user', targetId: id, metadata: parsed.value });
     return updated;
+  }).catch(error => {
+    throw mapUserWriteError(error);
   });
   return { user: toAdminUser(user), storage: 'database' };
 }
@@ -502,6 +595,7 @@ module.exports = {
   updateNewsletterSubscriber,
   updateOrderStatus,
   updateProduct,
+  validateAdminUserPatch,
   validateCouponPayload,
   validateProductPayload,
 };

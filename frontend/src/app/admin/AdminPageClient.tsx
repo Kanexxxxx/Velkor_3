@@ -7,12 +7,17 @@ import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
 import {
   createAdminProduct,
+  fetchAdminUsers,
   fetchAdminOrders,
   fetchAdminProducts,
   getAdminMe,
   isAdminApiUnavailable,
   legacyUnlock,
+  updateAdminOrderStatus,
   updateAdminProduct,
+  updateAdminUser,
+  type AdminRole,
+  type AdminUser,
   type AdminProduct
 } from '@/services/adminApi';
 import type { Order } from '@/types/order';
@@ -37,6 +42,7 @@ const emptyProductForm = {
 };
 
 type ProductFormState = typeof emptyProductForm;
+type UserFormState = Record<string, { name: string; email: string; role: AdminRole; emailVerified: boolean }>;
 
 function fallbackToAdminProduct(product: Product): AdminProduct {
   return {
@@ -112,10 +118,15 @@ function formToPayload(form: ProductFormState) {
 export function AdminPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [adminProducts, setAdminProducts] = useState<AdminProduct[]>(fallbackProducts.map(fallbackToAdminProduct));
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [userForms, setUserForms] = useState<UserFormState>({});
   const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productSaving, setProductSaving] = useState(false);
   const [productError, setProductError] = useState('');
+  const [userSavingId, setUserSavingId] = useState<string | null>(null);
+  const [userError, setUserError] = useState('');
+  const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [attempt, setAttempt] = useState('');
   const [error, setError] = useState('');
@@ -123,10 +134,21 @@ export function AdminPageClient() {
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
 
+  function applyAdminUsers(users: AdminUser[]) {
+    setAdminUsers(users);
+    setUserForms(Object.fromEntries(users.map(user => [user.id, {
+      name: user.name ?? '',
+      email: user.email,
+      role: user.role,
+      emailVerified: user.emailVerified,
+    }])));
+  }
+
   async function loadRealAdminData() {
-    const [remoteOrders, remoteProducts] = await Promise.all([fetchAdminOrders(), fetchAdminProducts()]);
+    const [remoteOrders, remoteProducts, remoteUsers] = await Promise.all([fetchAdminOrders(), fetchAdminProducts(), fetchAdminUsers()]);
     setOrders(remoteOrders);
     setAdminProducts(remoteProducts);
+    applyAdminUsers(remoteUsers);
     setApiMode('real');
     setUnlocked(true);
   }
@@ -139,10 +161,11 @@ export function AdminPageClient() {
       setError('');
       try {
         await getAdminMe();
-        const [remoteOrders, remoteProducts] = await Promise.all([fetchAdminOrders(), fetchAdminProducts()]);
+        const [remoteOrders, remoteProducts, remoteUsers] = await Promise.all([fetchAdminOrders(), fetchAdminProducts(), fetchAdminUsers()]);
         if (cancelled) return;
         setOrders(remoteOrders);
         setAdminProducts(remoteProducts);
+        applyAdminUsers(remoteUsers);
         setApiMode('real');
         setUnlocked(true);
       } catch (err) {
@@ -150,6 +173,7 @@ export function AdminPageClient() {
         if (isAdminApiUnavailable(err)) {
           setOrders(readOrders());
           setAdminProducts(fallbackProducts.map(fallbackToAdminProduct));
+          applyAdminUsers([]);
           setApiMode('demo');
         } else {
           setUnlocked(false);
@@ -174,6 +198,7 @@ export function AdminPageClient() {
     } catch {
       setOrders(readOrders());
       setAdminProducts(fallbackProducts.map(fallbackToAdminProduct));
+      applyAdminUsers([]);
       setApiMode('demo');
       setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
@@ -232,6 +257,50 @@ export function AdminPageClient() {
     }
   }
 
+  async function handleOrderStatusChange(order: Order, status: Order['status']) {
+    if (order.status === status) return;
+    setOrderSavingId(order.id);
+    setError('');
+    try {
+      const saved = await updateAdminOrderStatus(order.id, status);
+      setOrders(current => current.map(item => item.id === saved.id ? saved : item));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar pedido.');
+    } finally {
+      setOrderSavingId(null);
+    }
+  }
+
+  async function handleUserSubmit(event: FormEvent<HTMLFormElement>, user: AdminUser) {
+    event.preventDefault();
+    const form = userForms[user.id];
+    if (!form) return;
+    setUserSavingId(user.id);
+    setUserError('');
+    try {
+      const saved = await updateAdminUser(user.id, {
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        emailVerified: form.emailVerified,
+      });
+      setAdminUsers(current => current.map(item => item.id === saved.id ? saved : item));
+      setUserForms(current => ({
+        ...current,
+        [saved.id]: {
+          name: saved.name ?? '',
+          email: saved.email,
+          role: saved.role,
+          emailVerified: saved.emailVerified,
+        },
+      }));
+    } catch (err) {
+      setUserError(err instanceof Error ? err.message : 'Nao foi possivel salvar cliente.');
+    } finally {
+      setUserSavingId(null);
+    }
+  }
+
   if (checkingAdmin) {
     return (
       <main className="info-page">
@@ -254,6 +323,7 @@ export function AdminPageClient() {
       try {
         await legacyUnlock(attempt);
         setOrders(readOrders());
+        applyAdminUsers([]);
         setApiMode('legacy');
         setUnlocked(true);
       } catch (err) {
@@ -339,6 +409,10 @@ export function AdminPageClient() {
               <p>{adminProducts.length} itens cadastrados</p>
             </div>
             <div className="info-block">
+              <h2>Clientes</h2>
+              <p>{adminUsers.length} contas reais</p>
+            </div>
+            <div className="info-block">
               <h2>Unidades vendidas</h2>
               <p>{totals.units} unidades {apiMode === 'real' ? 'registradas' : 'no storage local'}</p>
             </div>
@@ -372,12 +446,107 @@ export function AdminPageClient() {
                         <h5>{order.id}</h5>
                         <div className="meta">{order.status.toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <div className="price">{formatPrice(order.total)}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <select
+                          value={order.status}
+                          onChange={event => handleOrderStatusChange(order, event.target.value as Order['status'])}
+                          disabled={orderSavingId === order.id || apiMode !== 'real'}
+                          aria-label={`Status do pedido ${order.id}`}
+                        >
+                          <option value="pending">Pendente</option>
+                          <option value="paid">Pago</option>
+                          <option value="fulfilled">Enviado</option>
+                          <option value="cancelled">Cancelado</option>
+                        </select>
+                        <div className="price">{formatPrice(order.total)}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p>Nenhum pedido criado ainda. Finalize um checkout para alimentar este painel.</p>
+              )}
+            </section>
+
+            <section className="info-block">
+              <h2>Clientes</h2>
+              {userError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 16 }}>{userError}</p> : null}
+              {adminUsers.length ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  {adminUsers.slice(0, 8).map(user => {
+                    const form = userForms[user.id] ?? { name: user.name ?? '', email: user.email, role: user.role, emailVerified: user.emailVerified };
+                    return (
+                      <form className="summary-item" style={{ gridTemplateColumns: '1fr', gap: 16 }} key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
+                        <div>
+                          <h5>{user.email}</h5>
+                          <div className="meta">{user.role} - {user.emailVerified ? 'email verificado' : 'email pendente'} - {user.orders.length} pedidos</div>
+                        </div>
+                        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                          <div className="field">
+                            <label htmlFor={`admin-user-name-${user.id}`}>Nome</label>
+                            <input
+                              id={`admin-user-name-${user.id}`}
+                              value={form.name}
+                              onChange={event => setUserForms(current => ({ ...current, [user.id]: { ...form, name: event.target.value } }))}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`admin-user-email-${user.id}`}>Email</label>
+                            <input
+                              id={`admin-user-email-${user.id}`}
+                              type="email"
+                              value={form.email}
+                              onChange={event => setUserForms(current => ({ ...current, [user.id]: { ...form, email: event.target.value } }))}
+                              required
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`admin-user-role-${user.id}`}>Role</label>
+                            <select
+                              id={`admin-user-role-${user.id}`}
+                              value={form.role}
+                              onChange={event => setUserForms(current => ({ ...current, [user.id]: { ...form, role: event.target.value as AdminRole } }))}
+                            >
+                              <option value="CUSTOMER">Cliente</option>
+                              <option value="ADMIN">Admin</option>
+                            </select>
+                          </div>
+                        </div>
+                        <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                          <input
+                            type="checkbox"
+                            checked={form.emailVerified}
+                            onChange={event => setUserForms(current => ({ ...current, [user.id]: { ...form, emailVerified: event.target.checked } }))}
+                          />
+                          Email verificado
+                        </label>
+                        {user.addresses.length ? (
+                          <div>
+                            <div className="meta" style={{ marginBottom: 8 }}>Enderecos</div>
+                            {user.addresses.slice(0, 3).map(address => (
+                              <p key={address.id} style={{ marginBottom: 6 }}>{address.recipient} - {address.street} - {address.city}/{address.region} - {address.postalCode}</p>
+                            ))}
+                          </div>
+                        ) : null}
+                        {user.orders.length ? (
+                          <div>
+                            <div className="meta" style={{ marginBottom: 8 }}>Pedidos do cliente</div>
+                            {user.orders.slice(0, 4).map(order => (
+                              <p key={order.id} style={{ marginBottom: 6 }}>{order.id} - {order.status.toUpperCase()} - {formatPrice(order.total)}</p>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div>
+                          <button type="submit" className="btn btn-primary" disabled={userSavingId === user.id || apiMode !== 'real'}>
+                            {userSavingId === user.id ? 'Salvando...' : 'Salvar cliente'}
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p>{apiMode === 'real' ? 'Nenhum cliente cadastrado ainda.' : 'Clientes reais aparecem aqui quando o admin estiver conectado ao PostgreSQL.'}</p>
               )}
             </section>
 
