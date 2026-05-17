@@ -545,42 +545,6 @@ async function handleRequest(req, res) {
     return;
   }
 
-  if (url.pathname === '/api/admin/unlock' && req.method === 'POST') {
-    const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp, 'admin')) {
-      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
-      return;
-    }
-    const adminSecret = appConfig.ADMIN_SECRET;
-    if (!adminSecret) {
-      sendJson(res, 503, { error: 'Painel admin não configurado no servidor. Defina ADMIN_SECRET no .env.' }, corsOrigin);
-      return;
-    }
-    try {
-      const body = await readBody(req);
-      let parsed;
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        sendJson(res, 400, { error: 'JSON inválido.' }, corsOrigin);
-        return;
-      }
-      const { password } = parsed;
-      if (typeof password !== 'string' || password !== adminSecret) {
-        sendJson(res, 401, { error: 'Senha incorreta.' }, corsOrigin);
-        return;
-      }
-      sendJson(res, 200, { ok: true }, corsOrigin);
-    } catch (err) {
-      if (err instanceof PayloadTooLargeError) {
-        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
-        return;
-      }
-      sendJson(res, 500, { error: 'Erro interno.' }, corsOrigin);
-    }
-    return;
-  }
-
   if (url.pathname === '/api/newsletter' && req.method === 'POST') {
     const clientIp = getClientIp(req);
     if (!checkRateLimit(clientIp, 'newsletter')) {
