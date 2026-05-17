@@ -1,93 +1,59 @@
-VELKOR — PROPRIETARY SOFTWARE LICENSE
+# VOLKERR Proprietary Software License
 
-Copyright (c) 2025–2026 VELKOR. All rights reserved.
+Copyright © 2025–2026 VOLKERR. All rights reserved.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-AVISO / NOTICE
+## Notice
 
-Este repositório contém código-fonte, sistema de design, identidade visual,
-ativos gráficos e materiais proprietários da marca VELKOR. O acesso a este
-repositório não concede qualquer licença de uso.
+This repository contains proprietary source code, software architecture, business logic, branding assets, design systems, databases, documentation and related materials owned exclusively by VOLKERR.
 
-This repository contains proprietary source code, design system, visual
-identity, graphic assets, and related materials owned by VELKOR. Access
-to this repository does not grant any license to use these materials.
+Access to this repository does not grant any right to use, reproduce, modify, distribute or commercialize any part of this software unless explicitly authorized in writing by VOLKERR.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-DIREITOS RESERVADOS / RIGHTS RESERVED
+## Restrictions
 
-Todos os direitos sobre este software, incluindo, mas não se limitando a,
-o código-fonte, design, lógica de negócio, banco de dados, branding, ativos
-e documentação, são de propriedade exclusiva da VELKOR.
+Without prior written permission from VOLKERR, you may NOT:
 
-É estritamente proibido, sem autorização prévia e por escrito da VELKOR:
+* Copy or reproduce any part of this repository;
+* Modify, adapt or create derivative works;
+* Distribute, sublicense, rent, lease or sell the software;
+* Use this software or its assets commercially or non-commercially;
+* Reverse engineer, decompile or disassemble any portion of the software;
+* Remove copyright or ownership notices;
+* Reuse the branding, visual identity or design system.
 
-  • Copiar, reproduzir ou distribuir qualquer parte deste repositório;
-  • Modificar, adaptar, traduzir ou criar obras derivadas;
-  • Sublicenciar, vender, alugar ou transferir estes materiais a terceiros;
-  • Usar este código ou ativos para fins comerciais ou não comerciais;
-  • Fazer engenharia reversa, descompilar ou desmontar o software;
-  • Remover ou alterar avisos de copyright ou atribuição de propriedade.
+All rights not expressly granted are reserved by VOLKERR.
 
-All rights to this software, including but not limited to source code,
-design, business logic, database, branding, assets, and documentation,
-are the exclusive property of VELKOR.
+---
 
-The following are strictly prohibited without prior written authorization
-from VELKOR:
+## Internal Contributors
 
-  • Copying, reproducing, or distributing any part of this repository;
-  • Modifying, adapting, translating, or creating derivative works;
-  • Sublicensing, selling, renting, or transferring these materials;
-  • Using this code or assets for any commercial or non-commercial purpose;
-  • Reverse engineering, decompiling, or disassembling the software;
-  • Removing or altering copyright notices or ownership attributions.
+Authorized contributors may access and modify the code solely for the purpose of developing and maintaining the VOLKERR platform, subject to applicable confidentiality agreements (NDA).
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-CONTRIBUIDORES / CONTRIBUTORS
+## Disclaimer
 
-Colaboradores internos com acesso concedido pela VELKOR podem ler e
-modificar o código exclusivamente para fins de desenvolvimento da plataforma
-VELKOR, nos termos do acordo de confidencialidade (NDA) aplicável.
+This software is provided "AS IS", without warranty of any kind, express or implied.
 
-Internal contributors with access granted by VELKOR may read and modify
-the code solely for the purpose of developing the VELKOR platform, subject
-to the applicable non-disclosure agreement (NDA).
+VOLKERR shall not be liable for any direct, indirect, incidental, special or consequential damages resulting from unauthorized use of this software.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-ISENÇÃO DE GARANTIA / DISCLAIMER OF WARRANTY
+## Jurisdiction
 
-ESTE SOFTWARE É FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM GARANTIA
-DE QUALQUER TIPO. A VELKOR NÃO SE RESPONSABILIZA POR DANOS DIRETOS,
-INDIRETOS, INCIDENTAIS OU CONSEQUENCIAIS DECORRENTES DO USO INDEVIDO
-DESTE MATERIAL.
+This license shall be governed by the laws of the Federative Republic of Brazil.
 
-THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. VELKOR
-SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
-DAMAGES ARISING FROM UNAUTHORIZED USE OF THESE MATERIALS.
+Any disputes arising from this software shall be subject exclusively to the jurisdiction of the courts of São Paulo — SP, Brazil.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-JURISDIÇÃO / JURISDICTION
+## Contact
 
-Este instrumento é regido pelas leis da República Federativa do Brasil.
-Fica eleito o foro da comarca de São Paulo — SP para dirimir quaisquer
-controvérsias.
+Licensing, partnerships and authorization requests:
 
-This instrument is governed by the laws of the Federative Republic of
-Brazil. The courts of São Paulo — SP are elected as the exclusive forum
-for resolving disputes.
+[velkor.officiall@gmail.com](mailto:velkor.officiall@gmail.com)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-CONTATO / CONTACT
-
-Para licenciamento, parcerias ou autorização de uso:
-For licensing, partnerships, or usage authorization:
-
-  velkor.officiall@gmail.com
-  https://volkerr.com.br
+https://volkerr.com.br
