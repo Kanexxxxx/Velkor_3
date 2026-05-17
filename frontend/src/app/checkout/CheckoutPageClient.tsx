@@ -11,6 +11,7 @@ import { trackEvent } from '@/components/Analytics';
 import { isValidEmail } from '@/services/auth';
 import { addOrder } from '@/services/orders';
 import { createRemoteOrder } from '@/services/orderApi';
+import { createPaymentPreference } from '@/services/paymentsApi';
 import { createOrderCode } from '@/services/checkout';
 import { API_BASE_URL } from '@/services/api';
 import { formatPrice, getProductById } from '@/services/products';
@@ -317,6 +318,17 @@ export function CheckoutPageClient() {
       if (savedRemotely) addOrder(order);
       trackEvent('Purchase', { value: order.total, currency: 'BRL', order_id: order.id });
       clearCart();
+
+      if (savedRemotely && payment === 'mercado-pago') {
+        try {
+          const preference = await createPaymentPreference(order.id);
+          notify('Redirecionando para o Mercado Pago.', 'success');
+          window.location.href = preference.initPoint;
+          return;
+        } catch (err) {
+          notify(err instanceof Error ? err.message : 'Nao foi possivel iniciar Mercado Pago.', 'error');
+        }
+      }
 
       const message = savedRemotely
         ? `Pedido criado com sucesso. Aguardando pagamento.`

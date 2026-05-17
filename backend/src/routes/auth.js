@@ -1,4 +1,5 @@
 const authRepo = require('../db/auth');
+const { createEmailClient } = require('../services/email');
 
 const COOKIE_NAME = 'velkor_sid';
 const MAX_BODY_BYTES = 32 * 1024;
@@ -158,7 +159,11 @@ function sendJson(res, statusCode, payload, corsOrigin, extraHeaders = {}) {
   res.end(body);
 }
 
-function createAuthHandler(repo = authRepo) {
+function createAuthHandler(repo = authRepo, options = {}) {
+  const emailService = options.emailService || createEmailClient();
+  const appConfig = options.appConfig || process.env;
+  const publicUrl = (appConfig.VELKOR_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
+
   async function requireAuth(req, res, corsOrigin) {
     const rawToken = getSessionCookie(req);
     const sessionUser = await repo.findSessionUser(rawToken);
@@ -318,7 +323,20 @@ function createAuthHandler(repo = authRepo) {
           return true;
         }
         const payload = await readJson(req);
-        if (isValidEmail(payload.email)) await repo.createPasswordResetToken(normalizeEmail(payload.email));
+        if (isValidEmail(payload.email)) {
+          const email = normalizeEmail(payload.email);
+          const token = await repo.createPasswordResetToken(email);
+          if (token) {
+            try {
+              await emailService.sendPasswordResetEmail({
+                to: email,
+                resetUrl: `${publicUrl}/account/reset-password?token=${encodeURIComponent(token)}`,
+              });
+            } catch (err) {
+              console.warn(`email.password_reset.failed to=${email} message=${err instanceof Error ? err.message : 'unknown'}`);
+            }
+          }
+        }
         sendJson(res, 200, { ok: true }, corsOrigin);
         return true;
       }
@@ -330,6 +348,35 @@ function createAuthHandler(repo = authRepo) {
           return true;
         }
         const ok = await repo.consumePasswordResetToken(payload.token, payload.newPassword);
+        sendJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: 'token_invalid' }, corsOrigin);
+        return true;
+      }
+
+      if (url.pathname === '/api/auth/email-verification/request' && req.method === 'POST') {
+        const current = await requireAuth(req, res, corsOrigin);
+        if (!current) return true;
+        const token = await repo.createEmailVerificationToken(current.user.id);
+        if (token) {
+          try {
+            await emailService.sendEmailVerification({
+              to: current.user.email,
+              verificationUrl: `${publicUrl}/account/verify-email?token=${encodeURIComponent(token)}`,
+            });
+          } catch (err) {
+            console.warn(`email.verification.failed to=${current.user.email} message=${err instanceof Error ? err.message : 'unknown'}`);
+          }
+        }
+        sendJson(res, 200, { ok: true }, corsOrigin);
+        return true;
+      }
+
+      if (url.pathname === '/api/auth/email-verification/confirm' && req.method === 'POST') {
+        const payload = await readJson(req);
+        if (typeof payload.token !== 'string' || !payload.token.trim()) {
+          sendJson(res, 400, { error: 'token_invalid' }, corsOrigin);
+          return true;
+        }
+        const ok = await repo.consumeEmailVerificationToken(payload.token);
         sendJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: 'token_invalid' }, corsOrigin);
         return true;
       }

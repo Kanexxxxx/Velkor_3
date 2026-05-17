@@ -1,47 +1,75 @@
-# Deploy VELKOR na VPS — Guia Completo
+# Deploy VOLKERR em VPS Ubuntu
 
-Stack: Ubuntu 22.04 LTS · Node.js 20 LTS · nginx · PM2 · Let's Encrypt (Certbot)
+Stack de producao: Ubuntu 22.04/24.04 LTS, Node.js 20 LTS, PostgreSQL, PM2, nginx e Certbot.
 
----
+Este guia assume que o dominio `velkor.com.br` aponta para o IP da VPS. Troque o dominio em todos os exemplos quando necessario.
 
-## Pré-requisitos
-
-- VPS com acesso root via SSH
-- Domínio apontando para o IP da VPS (ex.: `velkor.com.br` → A record)
-- Node.js 20+ instalado
-- npm 10+ instalado
+## 1. Preparar servidor
 
 ```bash
-# Verificar versões
-node -v   # v20.x.x ou superior
-npm -v    # 10.x.x ou superior
-```
+apt update
+apt install -y git curl nginx certbot python3-certbot-nginx postgresql postgresql-contrib
 
----
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
 
-## 1. Instalar dependências do servidor
-
-```bash
-# PM2 — gerenciador de processos Node.js
 npm install -g pm2
 
-# Certbot — certificado SSL gratuito via Let's Encrypt
-apt update && apt install -y certbot python3-certbot-nginx nginx
+node -v
+npm -v
+pm2 -v
 ```
 
----
-
-## 2. Clonar o repositório
+Exponha somente SSH, HTTP e HTTPS:
 
 ```bash
-cd /var/www
-git clone <url-do-repositorio> velkor
-cd velkor
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw enable
+ufw status
 ```
 
----
+As portas internas `3000` e `3001` nao devem ser abertas publicamente.
 
-## 3. Configurar variáveis de ambiente
+## 2. Banco PostgreSQL
+
+Crie banco e usuario com senha forte:
+
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE DATABASE velkor;
+CREATE USER velkor_user WITH ENCRYPTED PASSWORD 'troque-esta-senha';
+GRANT ALL PRIVILEGES ON DATABASE velkor TO velkor_user;
+\q
+```
+
+Guarde a URL:
+
+```env
+DATABASE_URL=postgresql://velkor_user:troque-esta-senha@127.0.0.1:5432/velkor
+```
+
+## 3. Clonar projeto
+
+```bash
+mkdir -p /var/www
+cd /var/www
+git clone <url-do-repositorio> velkor
+cd /var/www/velkor
+git checkout chore/project-cleanup-production-ready
+```
+
+Antes de cada deploy, registre o commit atual para rollback:
+
+```bash
+git rev-parse HEAD
+```
+
+## 4. Configurar envs
 
 ### Backend
 
@@ -50,27 +78,36 @@ cp backend/.env.example backend/.env
 nano backend/.env
 ```
 
-Preencher obrigatoriamente:
+Valores obrigatorios de producao:
 
 ```env
 NODE_ENV=production
 PORT=3001
-VELKOR_APP_NAME=VELKOR
+DATABASE_URL=postgresql://velkor_user:troque-esta-senha@127.0.0.1:5432/velkor
+SESSION_SECRET=<gere-com-64-bytes-aleatorios>
+ALLOWED_ORIGINS=https://velkor.com.br,https://www.velkor.com.br
 VELKOR_PUBLIC_URL=https://velkor.com.br
-VELKOR_SUPPORT_EMAIL=velkor.officiall@gmail.com
-VELKOR_WHATSAPP=+55 16 99706-2339
-VELKOR_INSTAGRAM=https://www.instagram.com/velk.0r/
 
-# Origens permitidas no CORS (separadas por vírgula, sem espaços)
-ALLOWED_ORIGINS=https://velkor.com.br
+ADMIN_EMAIL=<email-do-primeiro-admin>
+ADMIN_PASSWORD=<senha-forte-temporaria>
+LEGACY_ADMIN_UNLOCK_ENABLED=false
 
-# CRÍTICO: senha do painel admin — nunca usar NEXT_PUBLIC_
-ADMIN_SECRET=<gere-uma-senha-forte-com-openssl-rand-base64-32>
+GMAIL_HOST=smtp.gmail.com
+GMAIL_PORT=587
+GMAIL_USER=<conta-gmail>
+GMAIL_PASS=<senha-de-app-gmail>
+EMAIL_FROM=VELKOR <conta-gmail>
+EMAIL_DEV_MODE=false
+
+MERCADO_PAGO_ACCESS_TOKEN=<access-token>
+MERCADO_PAGO_WEBHOOK_SECRET=<segredo-do-webhook>
+MERCADO_PAGO_DEV_MODE=false
 ```
 
-Gerar `ADMIN_SECRET` seguro:
+Gerar `SESSION_SECRET`:
+
 ```bash
-openssl rand -base64 32
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
 ### Frontend
@@ -81,252 +118,159 @@ nano frontend/.env.local
 ```
 
 ```env
-# Atenção: SEM /api no final — o frontend já acrescenta /api em cada chamada
-# Ex.: fetch(`${NEXT_PUBLIC_API_URL}/api/health`) → https://velkor.com.br/api/health
 NEXT_PUBLIC_API_URL=https://velkor.com.br
-NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=<sua-chave-publica-mp>
-# Opcional — analytics
-NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
-NEXT_PUBLIC_META_PIXEL_ID=XXXXXXXXXXXXXXXXXX
+NEXT_PUBLIC_BRAND_SITE_URL=https://velkor.com.br
+NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=<public-key-mercado-pago>
 ```
 
----
+Nao coloque `DATABASE_URL`, `SESSION_SECRET`, Gmail, Mercado Pago access token ou webhook secret no frontend.
 
-## 4. Build do frontend
+## 5. Instalar dependencias
 
 ```bash
-cd /var/www/velkor/frontend
-npm ci --omit=dev
-npm run build
+npm ci --prefix backend
+npm ci --prefix frontend
 ```
 
-O build gera a pasta `frontend/.next/` com os arquivos estáticos e SSR.
+## 6. Migrar banco e criar admin inicial
 
----
-
-## 5. Iniciar serviços com PM2
+Use `migrate deploy` em producao:
 
 ```bash
-cd /var/www/velkor
+npm run db:deploy --prefix backend
+npm run db:seed --prefix backend
+```
 
-# Backend (Node.js puro — sem build necessário)
-pm2 start backend/src/server.js --name velkor-backend --cwd backend
+O seed usa `ADMIN_EMAIL` e `ADMIN_PASSWORD` para promover/criar o primeiro usuario admin. Troque a senha depois pelo fluxo real de auth.
 
-# Frontend (Next.js em modo produção)
-pm2 start "npm run start" --name velkor-frontend --cwd frontend
+## 7. Build do frontend
 
-# Salvar configuração para reiniciar após reboot
+```bash
+npm run build --prefix frontend
+```
+
+## 8. PM2
+
+Inicie backend e frontend pelo arquivo versionado:
+
+```bash
+pm2 start ecosystem.config.cjs --env production
 pm2 save
-pm2 startup   # seguir as instruções que aparecerem no terminal
+pm2 startup
 ```
 
-Verificar status:
+Siga o comando que o `pm2 startup` imprimir.
+
+Comandos uteis:
+
 ```bash
 pm2 status
-pm2 logs velkor-backend --lines 50
-pm2 logs velkor-frontend --lines 50
-```
-
-Portas em uso:
-- Frontend: `3000`
-- Backend: `3001`
-- nginx: `80` (HTTP → redirect) e `443` (HTTPS)
-
----
-
-## 6. Configurar nginx
-
-```bash
-nano /etc/nginx/sites-available/velkor
-```
-
-Colar a configuração abaixo (substituir `velkor.com.br` pelo domínio real):
-
-```nginx
-server {
-    listen 80;
-    server_name velkor.com.br www.velkor.com.br;
-    # Certbot vai adicionar redirect HTTPS aqui automaticamente
-}
-
-server {
-    listen 443 ssl;
-    server_name velkor.com.br www.velkor.com.br;
-
-    # Certificado SSL (preenchido pelo Certbot)
-    ssl_certificate     /etc/letsencrypt/live/velkor.com.br/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/velkor.com.br/privkey.pem;
-    include             /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
-
-    # Segurança
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-
-    # Tamanho máximo de upload
-    client_max_body_size 10M;
-
-    # IP real quando atrás do nginx (necessário para rate limiting)
-    set_real_ip_from 127.0.0.1;
-    real_ip_header X-Forwarded-For;
-
-    # Rotas de API → backend Node.js
-    location /api/ {
-        proxy_pass         http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_read_timeout 10s;
-    }
-
-    # Tudo mais → frontend Next.js
-    location / {
-        proxy_pass         http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade           $http_upgrade;
-        proxy_set_header   Connection        'upgrade';
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-Ativar e testar:
-```bash
-ln -s /etc/nginx/sites-available/velkor /etc/nginx/sites-enabled/
-nginx -t          # deve retornar: syntax is ok / test is successful
-systemctl reload nginx
-```
-
----
-
-## 7. Certificado SSL com Certbot
-
-```bash
-certbot --nginx -d velkor.com.br -d www.velkor.com.br
-```
-
-O Certbot edita automaticamente o arquivo nginx e configura renovação automática.
-
-Testar renovação automática:
-```bash
-certbot renew --dry-run
-```
-
----
-
-## 8. Verificação pós-deploy
-
-```bash
-# Backend health check
-curl https://velkor.com.br/api/health
-# Resposta esperada: {"status":"ok","service":"velkor-backend"}
-
-# Testar CORS (deve retornar 403 para origem desconhecida)
-curl -H "Origin: https://evil.com" https://velkor.com.br/api/health -v
-
-# Testar rate limit newsletter (6ª requisição deve retornar 429)
-for i in {1..6}; do
-  curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST https://velkor.com.br/api/newsletter \
-    -H "Content-Type: application/json" \
-    -d '{"email":"test@example.com"}'
-done
-
-# Frontend smoke test (requer servidor rodando)
-cd /var/www/velkor/frontend
-SMOKE_BASE_URL=https://velkor.com.br node scripts/smoke.mjs
-```
-
----
-
-## 9. Atualizações futuras
-
-```bash
-cd /var/www/velkor
-
-# 1. Puxar mudanças
-git pull origin main
-
-# 2. Rebuild do frontend (se houver mudanças)
-cd frontend && npm ci --omit=dev && npm run build && cd ..
-
-# 3. Reiniciar processos
+pm2 logs velkor-backend --lines 100
+pm2 logs velkor-frontend --lines 100
 pm2 restart velkor-backend velkor-frontend
 ```
 
----
+## 9. nginx
 
-## 10. Backup do newsletter.json
-
-O arquivo `backend/data/newsletter.json` é persistido em disco. Configure um cron de backup:
+Copie a configuracao exemplo:
 
 ```bash
-crontab -e
+cp docs/deploy/nginx/velkor.conf.example /etc/nginx/sites-available/velkor
+nano /etc/nginx/sites-available/velkor
 ```
 
-Adicionar linha (backup diário às 3h para `/var/backups/velkor/`):
-```cron
-0 3 * * * cp /var/www/velkor/backend/data/newsletter.json /var/backups/velkor/newsletter-$(date +\%Y\%m\%d).json
-```
+Confirme dominio e caminhos SSL. Na primeira instalacao, antes do Certbot emitir o certificado, voce pode deixar somente o bloco HTTP ou rodar Certbot com nginx para ele preencher SSL.
 
-Criar diretório de backup:
-```bash
-mkdir -p /var/backups/velkor
-```
-
----
-
-## Checklist de variáveis de produção
-
-Antes de abrir para o público, confirmar que cada variável está configurada:
-
-### Backend `backend/.env`
-- [ ] `NODE_ENV=production`
-- [ ] `PORT=3001`
-- [ ] `ALLOWED_ORIGINS=https://velkor.com.br` (sem trailing slash, sem espaços)
-- [ ] `ADMIN_SECRET=<senha forte gerada com openssl>`
-- [ ] `VELKOR_PUBLIC_URL=https://velkor.com.br`
-- [ ] `VELKOR_SUPPORT_EMAIL=<email real>`
-
-### Frontend `frontend/.env.local`
-- [ ] `NEXT_PUBLIC_API_URL=https://velkor.com.br` (sem /api no final)
-- [ ] `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY=<chave pública MP>`
-- [ ] Analytics IDs (opcional mas recomendado)
-
-### nginx
-- [ ] Certificado SSL ativo e válido (`certbot renew --dry-run` sem erros)
-- [ ] Redirect HTTP → HTTPS funcionando
-- [ ] Header `Strict-Transport-Security` presente
-- [ ] `client_max_body_size` configurado
-- [ ] `real_ip_header X-Forwarded-For` configurado (para rate limiting funcionar)
-
-### PM2
-- [ ] `pm2 save` executado após configurar processos
-- [ ] `pm2 startup` executado (reinicia automaticamente após reboot)
-
----
-
-## Portas e serviços
-
-| Serviço | Porta | Acesso externo |
-|---|---|---|
-| nginx | 80, 443 | Sim (público) |
-| Next.js (frontend) | 3000 | Não (apenas via nginx) |
-| Node.js (backend) | 3001 | Não (apenas via nginx) |
-
-As portas 3000 e 3001 **não devem ser abertas no firewall da VPS**. Apenas nginx fica exposto.
+Ative o site:
 
 ```bash
-# Configurar firewall (UFW)
-ufw allow 22/tcp   # SSH
-ufw allow 80/tcp   # HTTP
-ufw allow 443/tcp  # HTTPS
-ufw enable
-ufw status
+ln -s /etc/nginx/sites-available/velkor /etc/nginx/sites-enabled/velkor
+nginx -t
+systemctl reload nginx
 ```
+
+## 10. SSL com Certbot
+
+```bash
+certbot --nginx -d velkor.com.br -d www.velkor.com.br
+certbot renew --dry-run
+nginx -t
+systemctl reload nginx
+```
+
+## 11. Smoke tests pos-deploy
+
+```bash
+curl -i https://velkor.com.br/api/health
+curl -I https://velkor.com.br
+curl -I https://velkor.com.br/robots.txt
+curl -I https://velkor.com.br/sitemap.xml
+```
+
+Frontend smoke:
+
+```bash
+cd /var/www/velkor/frontend
+SMOKE_BASE_URL=https://velkor.com.br npm run smoke
+```
+
+Fluxos manuais obrigatorios antes de abrir trafego real:
+
+- cadastro, login, logout e reset de senha
+- verificacao de email
+- carrinho, checkout e pedido
+- Mercado Pago sandbox com webhook publico configurado
+- painel admin com usuario `ADMIN`
+- alteracao de status de pedido
+- cupons
+- newsletter opt-in e unsubscribe
+- responsividade mobile/desktop
+
+## 12. Atualizar deploy existente
+
+```bash
+cd /var/www/velkor
+git fetch origin
+git rev-parse HEAD
+git pull origin chore/project-cleanup-production-ready
+
+npm ci --prefix backend
+npm ci --prefix frontend
+npm run db:deploy --prefix backend
+npm run build --prefix frontend
+pm2 restart velkor-backend velkor-frontend
+
+curl -i https://velkor.com.br/api/health
+```
+
+## 13. Auditoria antes de producao real
+
+Rode localmente e/ou na VPS:
+
+```bash
+npm test
+npm run build
+npm run e2e --prefix frontend
+npm audit --prefix backend --audit-level=moderate
+npm audit --prefix frontend --audit-level=moderate
+cd backend && npx prisma validate --schema prisma/schema.prisma
+```
+
+Os testes E2E cobrem login/cadastro, carrinho, checkout, navbar/footer e responsividade em desktop e mobile.
+
+## 14. Rollback
+
+Use `docs/deploy/ROLLBACK.md` como procedimento operacional.
+
+Resumo rapido antes de migrations:
+
+```bash
+cd /var/www/velkor
+git checkout <commit-anterior>
+npm ci --prefix backend
+npm ci --prefix frontend
+npm run build --prefix frontend
+pm2 restart velkor-backend velkor-frontend
+```
+
+Depois de migrations, restaure backup do PostgreSQL antes de voltar codigo quando houver incompatibilidade de schema.

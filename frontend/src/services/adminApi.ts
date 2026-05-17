@@ -1,0 +1,146 @@
+import { API_BASE_URL } from '@/services/api';
+import type { Order } from '@/types/order';
+
+export type AdminRole = 'CUSTOMER' | 'ADMIN';
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: AdminRole;
+  emailVerified: boolean;
+  demoUser: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminCoupon {
+  id: string;
+  code: string;
+  discountType: 'PERCENT' | 'FIXED';
+  discountValue: number;
+  active: boolean;
+  startsAt: string | null;
+  expiresAt: string | null;
+  maxRedemptions: number | null;
+  redeemedCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  source: string;
+  isActive: boolean;
+  subscribedAt: string;
+  updatedAt: string;
+}
+
+export class AdminApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'AdminApiError';
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+      credentials: 'include',
+      cache: 'no-store',
+    });
+  } catch (error) {
+    throw new AdminApiError(error instanceof Error ? error.message : 'Admin API indisponivel.', 0);
+  }
+
+  const data = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new AdminApiError(data.error ?? `Erro admin: ${response.status}`, response.status);
+  return data as T;
+}
+
+export function isAdminApiUnavailable(error: unknown) {
+  return error instanceof AdminApiError && (error.status === 0 || error.status === 503);
+}
+
+export async function getAdminMe() {
+  const data = await request<{ user: AdminUser }>('/api/admin/me');
+  return data.user;
+}
+
+export async function fetchAdminOrders() {
+  const data = await request<{ orders: Order[]; storage?: string }>('/api/admin/orders');
+  return data.orders ?? [];
+}
+
+export async function updateAdminOrderStatus(id: string, status: Order['status']) {
+  const data = await request<{ order: Order }>(`/api/admin/orders/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return data.order;
+}
+
+export async function fetchAdminUsers() {
+  const data = await request<{ users: AdminUser[] }>('/api/admin/users');
+  return data.users ?? [];
+}
+
+export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser, 'role' | 'emailVerified'>>) {
+  const data = await request<{ user: AdminUser }>(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  return data.user;
+}
+
+export async function fetchAdminCoupons() {
+  const data = await request<{ coupons: AdminCoupon[] }>('/api/admin/coupons');
+  return data.coupons ?? [];
+}
+
+export async function createAdminCoupon(payload: Partial<AdminCoupon>) {
+  const data = await request<{ coupon: AdminCoupon }>('/api/admin/coupons', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data.coupon;
+}
+
+export async function updateAdminCoupon(id: string, payload: Partial<AdminCoupon>) {
+  const data = await request<{ coupon: AdminCoupon }>(`/api/admin/coupons/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return data.coupon;
+}
+
+export async function fetchNewsletterSubscribers() {
+  const data = await request<{ subscribers: NewsletterSubscriber[] }>('/api/admin/newsletter');
+  return data.subscribers ?? [];
+}
+
+export async function updateNewsletterSubscriber(id: string, patch: Partial<Pick<NewsletterSubscriber, 'isActive'>>) {
+  const data = await request<{ subscriber: NewsletterSubscriber }>(`/api/admin/newsletter/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  return data.subscriber;
+}
+
+export async function legacyUnlock(password: string) {
+  return request<{ ok: boolean; deprecated?: boolean }>('/api/admin/unlock', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}

@@ -26,14 +26,18 @@ test('auth session tokens are hashed without exposing the raw token', () => {
 
 test('auth repository uses demo-disabled results without database config', async () => {
   delete process.env.DATABASE_URL;
-  const { createSession, findSessionUser, listSessions } = require('../src/db/auth');
+  const { createEmailVerificationToken, createSession, consumeEmailVerificationToken, findSessionUser, listSessions } = require('../src/db/auth');
 
   const session = await createSession({ userId: 'usr_demo' });
   const user = await findSessionUser('not-a-real-token');
   const sessions = await listSessions('usr_demo');
+  const verificationToken = await createEmailVerificationToken('usr_demo');
+  const verificationResult = await consumeEmailVerificationToken('not-a-real-token');
 
   assert.equal(session, null);
   assert.equal(user, null);
+  assert.equal(verificationToken, null);
+  assert.equal(verificationResult, false);
   assert.deepEqual(sessions, []);
 });
 
@@ -113,4 +117,90 @@ test('auth route returns current user from session cookie and logs out', async (
   assert.equal(logoutRes.statusCode, 200);
   assert.equal(deletedToken, 'b'.repeat(64));
   assert.match(logoutRes.headers['Set-Cookie'], /Max-Age=0/);
+});
+
+test('auth route sends password reset email when token is created', async () => {
+  const { createAuthHandler } = require('../src/routes/auth');
+  let sentResetUrl = '';
+  const handler = createAuthHandler({
+    createPasswordResetToken: async () => 'reset-token',
+  }, {
+    emailService: {
+      sendPasswordResetEmail: async ({ resetUrl }) => {
+        sentResetUrl = resetUrl;
+        return { sent: false, mode: 'dev' };
+      },
+    },
+    appConfig: { VELKOR_PUBLIC_URL: 'https://velkor.test' },
+  });
+  const res = makeRes();
+
+  assert.equal(await handler(makeReq({ method: 'POST', url: '/api/auth/password-reset/request', body: { email: 'User@Example.com' } }), res, null), true);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).ok, true);
+  assert.equal(sentResetUrl, 'https://velkor.test/account/reset-password?token=reset-token');
+});
+
+test('auth route requests and confirms email verification', async () => {
+  const { createAuthHandler } = require('../src/routes/auth');
+  let sentVerificationUrl = '';
+  let confirmedToken = '';
+  const handler = createAuthHandler({
+    findSessionUser: async () => ({ user: { id: 'usr_1', email: 'user@example.com', role: 'CUSTOMER' } }),
+    createEmailVerificationToken: async userId => userId === 'usr_1' ? 'verify-token' : null,
+    consumeEmailVerificationToken: async token => {
+      confirmedToken = token;
+      return token === 'verify-token';
+    },
+  }, {
+    emailService: {
+      sendEmailVerification: async ({ verificationUrl }) => {
+        sentVerificationUrl = verificationUrl;
+        return { sent: false, mode: 'dev' };
+      },
+    },
+    appConfig: { VELKOR_PUBLIC_URL: 'https://velkor.test' },
+  });
+  const requestRes = makeRes();
+  const confirmRes = makeRes();
+
+  assert.equal(await handler(makeReq({ method: 'POST', url: '/api/auth/email-verification/request', headers: { cookie: 'velkor_sid=session' } }), requestRes, null), true);
+  assert.equal(await handler(makeReq({ method: 'POST', url: '/api/auth/email-verification/confirm', body: { token: 'verify-token' } }), confirmRes, null), true);
+
+  assert.equal(requestRes.statusCode, 200);
+  assert.equal(sentVerificationUrl, 'https://velkor.test/account/verify-email?token=verify-token');
+  assert.equal(confirmRes.statusCode, 200);
+  assert.equal(confirmedToken, 'verify-token');
+});
+
+test('admin guards reject missing sessions and customer users', async () => {
+  const { requireAuth, requireAdmin } = require('../src/routes/guards');
+  const missingRes = makeRes();
+  const customerRes = makeRes();
+
+  assert.equal(await requireAuth(makeReq(), missingRes, null, { findSessionUser: async () => null }), null);
+  assert.equal(missingRes.statusCode, 401);
+
+  assert.equal(await requireAdmin(
+    makeReq({ headers: { cookie: `velkor_sid=${'c'.repeat(64)}` } }),
+    customerRes,
+    null,
+    { findSessionUser: async () => ({ user: { id: 'usr_1', role: 'CUSTOMER' } }) }
+  ), null);
+  assert.equal(customerRes.statusCode, 403);
+});
+
+test('admin guards allow admin sessions', async () => {
+  const { requireAdmin } = require('../src/routes/guards');
+  const res = makeRes();
+  const context = await requireAdmin(
+    makeReq({ headers: { cookie: `velkor_sid=${'d'.repeat(64)}` } }),
+    res,
+    null,
+    { findSessionUser: async () => ({ user: { id: 'adm_1', role: 'ADMIN' } }) }
+  );
+
+  assert.equal(context.user.id, 'adm_1');
+  assert.equal(res.statusCode, 0);
 });

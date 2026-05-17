@@ -2,12 +2,16 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { getProductBySlug, listCategories, listProducts } = require('./db/products');
-const { subscribeNewsletter } = require('./db/newsletter');
+const { subscribeNewsletter, unsubscribeNewsletter } = require('./db/newsletter');
 const { addCartItem, deleteCartItem, listCartItems, updateCartItem } = require('./db/cart');
 const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wishlist');
 const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orders');
 const { getSessionId } = require('./db/session');
 const { createAuthHandler } = require('./routes/auth');
+const { createAdminHandler } = require('./routes/admin');
+const { createPaymentsHandler } = require('./routes/payments');
+const { sendOrderConfirmationIfNeeded } = require('./services/order-email');
+const { createEmailClient } = require('./services/email');
 
 const PORT = Number(process.env.PORT || 3001);
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -38,6 +42,9 @@ for (const [key, value] of Object.entries(appConfig)) {
 }
 
 const handleAuthRequest = createAuthHandler();
+const handleAdminRequest = createAdminHandler({ appConfig });
+const handlePaymentsRequest = createPaymentsHandler({ appConfig });
+const emailClient = createEmailClient(appConfig);
 
 // Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -180,6 +187,14 @@ function saveNewsletterEmail(email) {
   return { duplicate: false };
 }
 
+function unsubscribeNewsletterEmail(email) {
+  const emails = readNewsletterEmails();
+  const nextEmails = emails.map(entry => entry.email === email ? { ...entry, isActive: false, unsubscribedAt: new Date().toISOString() } : entry);
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(NEWSLETTER_FILE, JSON.stringify(nextEmails, null, 2), 'utf8');
+  return { ok: true };
+}
+
 class PayloadTooLargeError extends Error {
   constructor() {
     super('Payload too large');
@@ -255,6 +270,8 @@ async function handleRequest(req, res) {
   }
 
   if (await handleAuthRequest(req, res, corsOrigin)) return;
+  if (await handleAdminRequest(req, res, corsOrigin)) return;
+  if (await handlePaymentsRequest(req, res, corsOrigin)) return;
 
   if (url.pathname === '/api/products' && req.method === 'GET') {
     try {
@@ -445,6 +462,8 @@ async function handleRequest(req, res) {
         return;
       }
       const result = await createOrder(sessionId, parsed.value);
+      const email = await sendOrderConfirmationIfNeeded({ orderResult: result });
+      if (email) result.email = email;
       sendJson(res, 201, result, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {
@@ -542,42 +561,6 @@ async function handleRequest(req, res) {
     return;
   }
 
-  if (url.pathname === '/api/admin/unlock' && req.method === 'POST') {
-    const clientIp = getClientIp(req);
-    if (!checkRateLimit(clientIp, 'admin')) {
-      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
-      return;
-    }
-    const adminSecret = appConfig.ADMIN_SECRET;
-    if (!adminSecret) {
-      sendJson(res, 503, { error: 'Painel admin não configurado no servidor. Defina ADMIN_SECRET no .env.' }, corsOrigin);
-      return;
-    }
-    try {
-      const body = await readBody(req);
-      let parsed;
-      try {
-        parsed = JSON.parse(body);
-      } catch {
-        sendJson(res, 400, { error: 'JSON inválido.' }, corsOrigin);
-        return;
-      }
-      const { password } = parsed;
-      if (typeof password !== 'string' || password !== adminSecret) {
-        sendJson(res, 401, { error: 'Senha incorreta.' }, corsOrigin);
-        return;
-      }
-      sendJson(res, 200, { ok: true }, corsOrigin);
-    } catch (err) {
-      if (err instanceof PayloadTooLargeError) {
-        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
-        return;
-      }
-      sendJson(res, 500, { error: 'Erro interno.' }, corsOrigin);
-    }
-    return;
-  }
-
   if (url.pathname === '/api/newsletter' && req.method === 'POST') {
     const clientIp = getClientIp(req);
     if (!checkRateLimit(clientIp, 'newsletter')) {
@@ -599,6 +582,11 @@ async function handleRequest(req, res) {
         return;
       }
       const result = await subscribeNewsletter(email, saveNewsletterEmail);
+      try {
+        await emailClient.sendNewsletterOptIn({ to: email.trim().toLowerCase() });
+      } catch (err) {
+        console.warn(`email.newsletter_opt_in.failed to=${email} message=${err instanceof Error ? err.message : 'unknown'}`);
+      }
       sendJson(res, 200, { ok: true, duplicate: result.duplicate }, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {
@@ -610,6 +598,34 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === '/api/newsletter/unsubscribe' && req.method === 'POST') {
+    const clientIp = getClientIp(req);
+    if (!checkRateLimit(clientIp, 'newsletter-unsubscribe')) {
+      sendJson(res, 429, { error: 'Muitas tentativas. Aguarde um minuto.' }, corsOrigin);
+      return;
+    }
+    try {
+      const parsed = parseJsonBody(await readBody(req));
+      if (parsed.error) {
+        sendJson(res, 400, { error: parsed.error }, corsOrigin);
+        return;
+      }
+      const { email } = parsed.value;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        sendJson(res, 400, { error: 'Email invalido.' }, corsOrigin);
+        return;
+      }
+      await unsubscribeNewsletter(email, unsubscribeNewsletterEmail);
+      sendJson(res, 200, { ok: true }, corsOrigin);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        sendJson(res, 413, { error: 'Payload muito grande.' }, corsOrigin);
+        return;
+      }
+      sendJson(res, 500, { error: 'Erro interno.' }, corsOrigin);
+    }
+    return;
+  }
   sendJson(res, 404, { error: 'Rota não encontrada' }, corsOrigin);
 }
 

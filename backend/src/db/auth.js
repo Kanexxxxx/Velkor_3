@@ -4,6 +4,7 @@ const { getPrisma } = require('./client');
 
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30;
 const RESET_TOKEN_DURATION_MS = 1000 * 60 * 60;
+const EMAIL_VERIFICATION_TOKEN_DURATION_MS = 1000 * 60 * 60 * 24;
 
 function createRawSessionToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -163,6 +164,47 @@ async function createPasswordResetToken(email) {
   return rawToken;
 }
 
+async function createEmailVerificationToken(userId) {
+  const prisma = getPrisma();
+  if (!prisma) return null;
+
+  const rawToken = createRawSessionToken();
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId,
+      tokenHash: hashSessionToken(rawToken),
+      expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_DURATION_MS),
+    },
+  });
+
+  return rawToken;
+}
+
+async function consumeEmailVerificationToken(rawToken) {
+  const prisma = getPrisma();
+  if (!prisma || !rawToken) return false;
+
+  const tokenHash = hashSessionToken(rawToken);
+  const verificationToken = await prisma.emailVerificationToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!verificationToken || verificationToken.usedAt || verificationToken.expiresAt.getTime() < Date.now()) return false;
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: verificationToken.userId },
+      data: { emailVerified: true },
+    }),
+    prisma.emailVerificationToken.update({
+      where: { id: verificationToken.id },
+      data: { usedAt: new Date() },
+    }),
+  ]);
+
+  return true;
+}
+
 async function consumePasswordResetToken(rawToken, newPassword) {
   const prisma = getPrisma();
   if (!prisma || !rawToken) return false;
@@ -193,10 +235,12 @@ async function consumePasswordResetToken(rawToken, newPassword) {
 module.exports = {
   SESSION_DURATION_MS,
   createPasswordResetToken,
+  createEmailVerificationToken,
   createRawSessionToken,
   createSession,
   createUser,
   consumePasswordResetToken,
+  consumeEmailVerificationToken,
   deleteOtherSessions,
   deleteSession,
   findSessionUser,

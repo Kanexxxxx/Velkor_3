@@ -9,6 +9,7 @@
     "test": "npm run check && node --test",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },
@@ -23,6 +24,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
+    "nodemailer": "^8.0.7",
     "pg": "^8.20.0"
   },
   "overrides": {
