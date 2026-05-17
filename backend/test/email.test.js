@@ -57,3 +57,17 @@ test('order email helper sends confirmation only when an order exists', async ()
   assert.equal(sent[0].to, 'buyer@example.com');
   assert.equal(skipped, null);
 });
+
+test('newsletter unsubscribe is idempotent without database config', async () => {
+  delete process.env.DATABASE_URL;
+  const { unsubscribeNewsletter } = require('../src/db/newsletter');
+  const calls = [];
+
+  const result = await unsubscribeNewsletter(' Customer@Example.com ', email => {
+    calls.push(email);
+    return { ok: true };
+  });
+
+  assert.deepEqual(result, { ok: true, storage: 'json' });
+  assert.deepEqual(calls, ['customer@example.com']);
+});

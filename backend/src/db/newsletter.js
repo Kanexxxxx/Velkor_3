@@ -23,4 +23,19 @@ async function subscribeNewsletter(rawEmail, jsonFallback) {
   return { duplicate: false, storage: 'database' };
 }
 
-module.exports = { subscribeNewsletter };
+async function unsubscribeNewsletter(rawEmail, jsonFallback) {
+  const email = rawEmail.trim().toLowerCase();
+  const prisma = getPrisma();
+
+  if (!prisma) {
+    return { ...jsonFallback(email), storage: 'json' };
+  }
+
+  await prisma.newsletterSubscriber.updateMany({
+    where: { email },
+    data: { isActive: false },
+  });
+  return { ok: true, storage: 'database' };
+}
+
+module.exports = { subscribeNewsletter, unsubscribeNewsletter };
