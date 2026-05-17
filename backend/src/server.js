@@ -9,6 +9,7 @@ const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orde
 const { getSessionId } = require('./db/session');
 const { createAuthHandler } = require('./routes/auth');
 const { createAdminHandler } = require('./routes/admin');
+const { sendOrderConfirmationIfNeeded } = require('./services/order-email');
 
 const PORT = Number(process.env.PORT || 3001);
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -448,6 +449,8 @@ async function handleRequest(req, res) {
         return;
       }
       const result = await createOrder(sessionId, parsed.value);
+      const email = await sendOrderConfirmationIfNeeded({ orderResult: result });
+      if (email) result.email = email;
       sendJson(res, 201, result, corsOrigin);
     } catch (err) {
       if (err instanceof PayloadTooLargeError) {

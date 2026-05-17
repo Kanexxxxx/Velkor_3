@@ -33,3 +33,27 @@ test('email templates build password reset and order confirmation content', () =
   assert.match(order.subject, /pedido/i);
   assert.match(order.text, /ord_1/);
 });
+
+test('order email helper sends confirmation only when an order exists', async () => {
+  const { sendOrderConfirmationIfNeeded } = require('../src/services/order-email');
+  const sent = [];
+  const emailService = {
+    sendOrderConfirmation: async payload => {
+      sent.push(payload);
+      return { sent: false, mode: 'dev' };
+    },
+  };
+
+  const result = await sendOrderConfirmationIfNeeded({
+    orderResult: { order: { id: 'ord_2', contact: { email: 'buyer@example.com' }, total: 99, items: [] }, storage: 'database' },
+    emailService,
+  });
+  const skipped = await sendOrderConfirmationIfNeeded({
+    orderResult: { order: null, storage: 'demo' },
+    emailService,
+  });
+
+  assert.equal(result.mode, 'dev');
+  assert.equal(sent[0].to, 'buyer@example.com');
+  assert.equal(skipped, null);
+});
