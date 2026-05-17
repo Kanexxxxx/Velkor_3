@@ -7,6 +7,7 @@ const { addCartItem, deleteCartItem, listCartItems, updateCartItem } = require('
 const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wishlist');
 const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orders');
 const { getSessionId } = require('./db/session');
+const { createAuthHandler } = require('./routes/auth');
 
 const PORT = Number(process.env.PORT || 3001);
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -35,6 +36,8 @@ const appConfig = {
 for (const [key, value] of Object.entries(appConfig)) {
   if (process.env[key] === undefined) process.env[key] = value;
 }
+
+const handleAuthRequest = createAuthHandler();
 
 // Rate limiting — 5 requests por IP por minuto no endpoint de newsletter
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -88,8 +91,9 @@ function sendJson(res, statusCode, payload, corsOrigin) {
   const body = JSON.stringify(payload);
   const corsHeaders = corsOrigin ? {
     'Access-Control-Allow-Origin': corsOrigin,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+    'Access-Control-Allow-Credentials': 'true',
     'Vary': 'Origin'
   } : {};
   res.writeHead(statusCode, {
@@ -222,8 +226,9 @@ async function handleRequest(req, res) {
     if (corsOrigin) {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': corsOrigin,
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+        'Access-Control-Allow-Credentials': 'true',
         'Vary': 'Origin'
       });
     } else {
@@ -248,6 +253,8 @@ async function handleRequest(req, res) {
     }, corsOrigin);
     return;
   }
+
+  if (await handleAuthRequest(req, res, corsOrigin)) return;
 
   if (url.pathname === '/api/products' && req.method === 'GET') {
     try {
