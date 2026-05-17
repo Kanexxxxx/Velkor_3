@@ -5,9 +5,8 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getInfoHref } from '@/services/infoPages';
 import { formatPrice, products } from '@/services/products';
 import { readOrders } from '@/services/orders';
+import { fetchAdminOrders, getAdminMe, isAdminApiUnavailable, legacyUnlock } from '@/services/adminApi';
 import type { Order } from '@/types/order';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export function AdminPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -15,10 +14,62 @@ export function AdminPageClient() {
   const [attempt, setAttempt] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
+
+  async function loadRealAdminData() {
+    const remoteOrders = await fetchAdminOrders();
+    setOrders(remoteOrders);
+    setApiMode('real');
+    setUnlocked(true);
+  }
 
   useEffect(() => {
-    if (unlocked) setOrders(readOrders());
-  }, [unlocked]);
+    let cancelled = false;
+
+    async function checkAdmin() {
+      setCheckingAdmin(true);
+      setError('');
+      try {
+        await getAdminMe();
+        const remoteOrders = await fetchAdminOrders();
+        if (cancelled) return;
+        setOrders(remoteOrders);
+        setApiMode('real');
+        setUnlocked(true);
+      } catch (err) {
+        if (cancelled) return;
+        if (isAdminApiUnavailable(err)) {
+          setOrders(readOrders());
+          setApiMode('demo');
+        } else {
+          setUnlocked(false);
+          setApiMode('legacy');
+        }
+      } finally {
+        if (!cancelled) setCheckingAdmin(false);
+      }
+    }
+
+    checkAdmin();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function refreshAdminData() {
+    setLoading(true);
+    setError('');
+    try {
+      await loadRealAdminData();
+    } catch {
+      setOrders(readOrders());
+      setApiMode('demo');
+      setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const totals = useMemo(() => {
     const revenue = orders.reduce((sum, order) => sum + order.total, 0);
@@ -33,26 +84,33 @@ export function AdminPageClient() {
     return counts;
   }, {});
 
+  if (checkingAdmin) {
+    return (
+      <main className="info-page">
+        <div className="container" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
+            <div className="section-num" style={{ marginBottom: 12 }}>PAINEL ADMIN</div>
+            <h1 style={{ marginBottom: 16 }}>Validando <span className="red">acesso.</span></h1>
+            <p>Conferindo sessao administrativa...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (!unlocked) {
     async function handleUnlock(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`${API_URL}/api/admin/unlock`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: attempt })
-        });
-        if (res.ok) {
-          setUnlocked(true);
-        } else {
-          const data = await res.json().catch(() => ({})) as { error?: string };
-          setError(data.error ?? 'Senha incorreta.');
-          setAttempt('');
-        }
-      } catch {
-        setError('Não foi possível conectar ao servidor. Verifique se o backend está ativo em ' + API_URL);
+        await legacyUnlock(attempt);
+        setOrders(readOrders());
+        setApiMode('legacy');
+        setUnlocked(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Senha incorreta.');
+        setAttempt('');
       } finally {
         setLoading(false);
       }
@@ -63,10 +121,11 @@ export function AdminPageClient() {
         <div className="container" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
             <div className="section-num" style={{ marginBottom: 12 }}>PAINEL ADMIN</div>
-            <h1 style={{ marginBottom: 32 }}>Acesso <span className="red">Restrito.</span></h1>
+            <h1 style={{ marginBottom: 24 }}>Acesso <span className="red">Restrito.</span></h1>
+            <p style={{ marginBottom: 24 }}>Entre com uma conta ADMIN. O acesso legado por senha permanece temporario para rollback.</p>
             <form onSubmit={handleUnlock} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="field">
-                <label htmlFor="admin-password">Senha de acesso</label>
+                <label htmlFor="admin-password">Senha de acesso legado</label>
                 <input
                   id="admin-password"
                   type="password"
@@ -92,7 +151,7 @@ export function AdminPageClient() {
     <main className="info-page">
       <div className="container">
         <div className="crumbs">
-          <Link href="/">Início</Link>
+          <Link href="/">Inicio</Link>
           <span className="sep">/</span>
           <span>Admin</span>
         </div>
@@ -101,10 +160,21 @@ export function AdminPageClient() {
           <div>
             <div className="section-num">PAINEL ADMIN</div>
             <h1>Controle <span className="red">Velkor.</span></h1>
-            <p>Visão MVP para acompanhar catálogo, pedidos locais e preparação da futura integração com backend e PostgreSQL.</p>
+            <p>{apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}</p>
           </div>
-          <Link href="/shop" className="btn btn-primary">Ver loja</Link>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary" onClick={refreshAdminData} disabled={loading}>
+              {loading ? 'Atualizando...' : 'Atualizar'}
+            </button>
+            <Link href="/shop" className="btn btn-primary">Ver loja</Link>
+          </div>
         </section>
+
+        {error ? (
+          <section className="info-content" style={{ marginBottom: 24 }}>
+            <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p>
+          </section>
+        ) : null}
 
         <section className="info-content" style={{ marginBottom: 32 }}>
           <div className="account-grid">
@@ -122,7 +192,7 @@ export function AdminPageClient() {
             </div>
             <div className="info-block">
               <h2>Unidades vendidas</h2>
-              <p>{totals.units} unidades no storage local</p>
+              <p>{totals.units} unidades {apiMode === 'real' ? 'registradas' : 'no storage local'}</p>
             </div>
           </div>
         </section>
@@ -130,13 +200,13 @@ export function AdminPageClient() {
         <section className="info-layout">
           <aside className="info-nav">
             <div>
-              <h4>Catálogo</h4>
-              <Link href="/shop?cat=sneakers">Tênis ({categoryCounts.sneakers ?? 0})</Link>
-              <Link href="/shop?cat=apparel">Vestuário ({categoryCounts.apparel ?? 0})</Link>
-              <Link href="/shop?cat=accessories">Acessórios ({categoryCounts.accessories ?? 0})</Link>
+              <h4>Catalogo</h4>
+              <Link href="/shop?cat=sneakers">Tenis ({categoryCounts.sneakers ?? 0})</Link>
+              <Link href="/shop?cat=apparel">Vestuario ({categoryCounts.apparel ?? 0})</Link>
+              <Link href="/shop?cat=accessories">Acessorios ({categoryCounts.accessories ?? 0})</Link>
             </div>
             <div>
-              <h4>Operação</h4>
+              <h4>Operacao</h4>
               <Link href="/checkout">Checkout</Link>
               <Link href={getInfoHref('track-order')}>Rastreio</Link>
               <Link href={getInfoHref('refund-policy')}>Reembolso</Link>
@@ -159,12 +229,12 @@ export function AdminPageClient() {
                   ))}
                 </div>
               ) : (
-                <p>Nenhum pedido local criado ainda. Finalize um checkout para alimentar este painel.</p>
+                <p>Nenhum pedido criado ainda. Finalize um checkout para alimentar este painel.</p>
               )}
             </section>
 
             <section className="info-block">
-              <h2>Catálogo ativo</h2>
+              <h2>Catalogo ativo</h2>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
                 {products.slice(0, 8).map(product => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
