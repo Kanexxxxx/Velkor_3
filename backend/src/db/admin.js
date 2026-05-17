@@ -19,6 +19,46 @@ function toIso(value) {
   return value instanceof Date ? value.toISOString() : value;
 }
 
+function boolEnv(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
+
+function hasSecret(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function buildAdminSettings(env = process.env) {
+  return {
+    store: {
+      appName: env.VELKOR_APP_NAME || 'VELKOR',
+      publicUrl: env.VELKOR_PUBLIC_URL || 'http://localhost:3000',
+      supportEmail: env.VELKOR_SUPPORT_EMAIL || 'velkor.officiall@gmail.com',
+      whatsapp: env.VELKOR_WHATSAPP || '',
+      instagram: env.VELKOR_INSTAGRAM || '',
+      allowedOrigins: String(env.ALLOWED_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean),
+      legacyAdminUnlockEnabled: String(env.LEGACY_ADMIN_UNLOCK_ENABLED).toLowerCase() !== 'false' && hasSecret(env.ADMIN_SECRET),
+    },
+    integrations: {
+      mercadoPago: {
+        configured: hasSecret(env.MERCADO_PAGO_ACCESS_TOKEN),
+        devMode: boolEnv(env.MERCADO_PAGO_DEV_MODE, true) || !hasSecret(env.MERCADO_PAGO_ACCESS_TOKEN),
+        webhookConfigured: hasSecret(env.MERCADO_PAGO_WEBHOOK_SECRET),
+      },
+      email: {
+        configured: hasSecret(env.GMAIL_USER) && hasSecret(env.GMAIL_PASS),
+        devMode: boolEnv(env.EMAIL_DEV_MODE, true),
+        user: env.GMAIL_USER || '',
+      },
+      melhorEnvio: {
+        configured: hasSecret(env.MELHOR_ENVIO_ACCESS_TOKEN) && hasSecret(env.MELHOR_ENVIO_ORIGIN_CEP),
+        env: env.MELHOR_ENVIO_ENV || 'sandbox',
+        originCepConfigured: hasSecret(env.MELHOR_ENVIO_ORIGIN_CEP),
+      },
+    },
+  };
+}
+
 function mapProductWriteError(error) {
   if (error?.code === 'P2002') {
     const conflict = new Error('Produto com ID ou slug ja cadastrado.');
@@ -580,6 +620,7 @@ async function updateNewsletterSubscriber(id, patch, adminUserId) {
 }
 
 module.exports = {
+  buildAdminSettings,
   createCoupon,
   createProduct,
   listAdminOrders,

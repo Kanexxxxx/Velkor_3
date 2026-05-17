@@ -207,6 +207,45 @@ test('admin route creates and updates products for admins', async () => {
   assert.deepEqual(calls.map(call => call.adminUserId), ['adm_products', 'adm_products']);
 });
 
+test('admin settings expose public config and secret presence only', async () => {
+  const { buildAdminSettings } = require('../src/db/admin');
+  const { createAdminHandler } = require('../src/routes/admin');
+  const settings = buildAdminSettings({
+    VELKOR_APP_NAME: 'VOLKERR',
+    VELKOR_PUBLIC_URL: 'https://volkerr.com.br',
+    VELKOR_SUPPORT_EMAIL: 'contato@volkerr.com.br',
+    VELKOR_WHATSAPP: '+55 16 99999-9999',
+    VELKOR_INSTAGRAM: 'https://instagram.com/volkerr',
+    MERCADO_PAGO_ACCESS_TOKEN: 'mp-secret',
+    MERCADO_PAGO_DEV_MODE: 'true',
+    GMAIL_USER: 'loja@volkerr.com.br',
+    GMAIL_PASS: 'gmail-secret',
+    EMAIL_DEV_MODE: 'false',
+    MELHOR_ENVIO_ACCESS_TOKEN: 'me-secret',
+    MELHOR_ENVIO_ORIGIN_CEP: '14000-000',
+    MELHOR_ENVIO_ENV: 'sandbox',
+  });
+
+  assert.equal(settings.store.publicUrl, 'https://volkerr.com.br');
+  assert.equal(settings.integrations.mercadoPago.configured, true);
+  assert.equal(settings.integrations.email.configured, true);
+  assert.equal(settings.integrations.melhorEnvio.configured, true);
+  assert.equal(JSON.stringify(settings).includes('mp-secret'), false);
+  assert.equal(JSON.stringify(settings).includes('gmail-secret'), false);
+  assert.equal(JSON.stringify(settings).includes('me-secret'), false);
+
+  const res = makeRes();
+  const handler = createAdminHandler({
+    authRepo: { findSessionUser: async () => ({ user: { id: 'adm_settings', role: 'ADMIN' } }) },
+    appConfig: { VELKOR_PUBLIC_URL: 'https://volkerr.com.br' },
+    repo: { buildAdminSettings },
+  });
+
+  assert.equal(await handler(makeReq({ method: 'GET', url: '/api/admin/settings' }), res, null), true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).settings.store.publicUrl, 'https://volkerr.com.br');
+});
+
 test('legacy admin unlock returns gone when disabled', async () => {
   const { createAdminHandler } = require('../src/routes/admin');
   const res = makeRes();

@@ -61,6 +61,23 @@ export interface NewsletterSubscriber {
   updatedAt: string;
 }
 
+export interface AdminSettings {
+  store: {
+    appName: string;
+    publicUrl: string;
+    supportEmail: string;
+    whatsapp: string;
+    instagram: string;
+    allowedOrigins: string[];
+    legacyAdminUnlockEnabled: boolean;
+  };
+  integrations: {
+    mercadoPago: { configured: boolean; devMode: boolean; webhookConfigured: boolean };
+    email: { configured: boolean; devMode: boolean; user: string };
+    melhorEnvio: { configured: boolean; env: string; originCepConfigured: boolean };
+  };
+}
+
 export interface AdminProduct {
   id: string;
   slug: string;
@@ -133,6 +150,11 @@ export async function fetchAdminOrders() {
 export async function fetchAdminProducts() {
   const data = await request<{ products: AdminProduct[]; storage?: string }>('/api/admin/products');
   return data.products ?? [];
+}
+
+export async function fetchAdminSettings() {
+  const data = await request<{ settings: AdminSettings }>('/api/admin/settings');
+  return data.settings;
 }
 
 export async function createAdminProduct(payload: Partial<AdminProduct>) {

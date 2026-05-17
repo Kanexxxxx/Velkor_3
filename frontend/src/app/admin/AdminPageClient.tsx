@@ -7,17 +7,26 @@ import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
 import {
   createAdminProduct,
+  createAdminCoupon,
+  fetchAdminCoupons,
   fetchAdminUsers,
   fetchAdminOrders,
   fetchAdminProducts,
+  fetchAdminSettings,
+  fetchNewsletterSubscribers,
   getAdminMe,
   isAdminApiUnavailable,
   legacyUnlock,
+  updateAdminCoupon,
   updateAdminOrderStatus,
   updateAdminProduct,
   updateAdminUser,
+  updateNewsletterSubscriber,
+  type AdminCoupon,
   type AdminRole,
+  type AdminSettings,
   type AdminUser,
+  type NewsletterSubscriber,
   type AdminProduct
 } from '@/services/adminApi';
 import type { Order } from '@/types/order';
@@ -41,7 +50,16 @@ const emptyProductForm = {
   active: true,
 };
 
+const emptyCouponForm = {
+  code: '',
+  discountType: 'PERCENT',
+  discountValue: '',
+  maxRedemptions: '',
+  active: true,
+};
+
 type ProductFormState = typeof emptyProductForm;
+type CouponFormState = typeof emptyCouponForm;
 type UserFormState = Record<string, { name: string; email: string; role: AdminRole; emailVerified: boolean }>;
 
 function fallbackToAdminProduct(product: Product): AdminProduct {
@@ -115,17 +133,37 @@ function formToPayload(form: ProductFormState) {
   };
 }
 
+function couponToPayload(form: CouponFormState) {
+  const discountValue = form.discountType === 'FIXED'
+    ? Math.round(Number(form.discountValue) * 100)
+    : Number(form.discountValue);
+  return {
+    code: form.code,
+    discountType: form.discountType as AdminCoupon['discountType'],
+    discountValue,
+    maxRedemptions: form.maxRedemptions ? Number(form.maxRedemptions) : null,
+    active: form.active,
+  };
+}
+
 export function AdminPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [adminProducts, setAdminProducts] = useState<AdminProduct[]>(fallbackProducts.map(fallbackToAdminProduct));
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminCoupons, setAdminCoupons] = useState<AdminCoupon[]>([]);
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
+  const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
   const [userForms, setUserForms] = useState<UserFormState>({});
+  const [couponForm, setCouponForm] = useState<CouponFormState>(emptyCouponForm);
   const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productSaving, setProductSaving] = useState(false);
   const [productError, setProductError] = useState('');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
+  const [couponSaving, setCouponSaving] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [newsletterSavingId, setNewsletterSavingId] = useState<string | null>(null);
   const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [attempt, setAttempt] = useState('');
@@ -145,10 +183,20 @@ export function AdminPageClient() {
   }
 
   async function loadRealAdminData() {
-    const [remoteOrders, remoteProducts, remoteUsers] = await Promise.all([fetchAdminOrders(), fetchAdminProducts(), fetchAdminUsers()]);
+    const [remoteOrders, remoteProducts, remoteUsers, remoteCoupons, remoteNewsletter, remoteSettings] = await Promise.all([
+      fetchAdminOrders(),
+      fetchAdminProducts(),
+      fetchAdminUsers(),
+      fetchAdminCoupons(),
+      fetchNewsletterSubscribers(),
+      fetchAdminSettings(),
+    ]);
     setOrders(remoteOrders);
     setAdminProducts(remoteProducts);
     applyAdminUsers(remoteUsers);
+    setAdminCoupons(remoteCoupons);
+    setNewsletterSubscribers(remoteNewsletter);
+    setAdminSettings(remoteSettings);
     setApiMode('real');
     setUnlocked(true);
   }
@@ -161,11 +209,21 @@ export function AdminPageClient() {
       setError('');
       try {
         await getAdminMe();
-        const [remoteOrders, remoteProducts, remoteUsers] = await Promise.all([fetchAdminOrders(), fetchAdminProducts(), fetchAdminUsers()]);
+        const [remoteOrders, remoteProducts, remoteUsers, remoteCoupons, remoteNewsletter, remoteSettings] = await Promise.all([
+          fetchAdminOrders(),
+          fetchAdminProducts(),
+          fetchAdminUsers(),
+          fetchAdminCoupons(),
+          fetchNewsletterSubscribers(),
+          fetchAdminSettings(),
+        ]);
         if (cancelled) return;
         setOrders(remoteOrders);
         setAdminProducts(remoteProducts);
         applyAdminUsers(remoteUsers);
+        setAdminCoupons(remoteCoupons);
+        setNewsletterSubscribers(remoteNewsletter);
+        setAdminSettings(remoteSettings);
         setApiMode('real');
         setUnlocked(true);
       } catch (err) {
@@ -174,6 +232,9 @@ export function AdminPageClient() {
           setOrders(readOrders());
           setAdminProducts(fallbackProducts.map(fallbackToAdminProduct));
           applyAdminUsers([]);
+          setAdminCoupons([]);
+          setNewsletterSubscribers([]);
+          setAdminSettings(null);
           setApiMode('demo');
         } else {
           setUnlocked(false);
@@ -199,6 +260,9 @@ export function AdminPageClient() {
       setOrders(readOrders());
       setAdminProducts(fallbackProducts.map(fallbackToAdminProduct));
       applyAdminUsers([]);
+      setAdminCoupons([]);
+      setNewsletterSubscribers([]);
+      setAdminSettings(null);
       setApiMode('demo');
       setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
@@ -301,6 +365,47 @@ export function AdminPageClient() {
     }
   }
 
+  async function handleCouponSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCouponSaving(true);
+    setCouponError('');
+    try {
+      const saved = await createAdminCoupon(couponToPayload(couponForm));
+      setAdminCoupons(current => [saved, ...current.filter(coupon => coupon.id !== saved.id)]);
+      setCouponForm(emptyCouponForm);
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : 'Nao foi possivel salvar cupom.');
+    } finally {
+      setCouponSaving(false);
+    }
+  }
+
+  async function toggleCoupon(coupon: AdminCoupon) {
+    setCouponSaving(true);
+    setCouponError('');
+    try {
+      const saved = await updateAdminCoupon(coupon.id, { ...coupon, active: !coupon.active });
+      setAdminCoupons(current => current.map(item => item.id === saved.id ? saved : item));
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : 'Nao foi possivel atualizar cupom.');
+    } finally {
+      setCouponSaving(false);
+    }
+  }
+
+  async function toggleNewsletter(subscriber: NewsletterSubscriber) {
+    setNewsletterSavingId(subscriber.id);
+    setError('');
+    try {
+      const saved = await updateNewsletterSubscriber(subscriber.id, { isActive: !subscriber.isActive });
+      setNewsletterSubscribers(current => current.map(item => item.id === saved.id ? saved : item));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar newsletter.');
+    } finally {
+      setNewsletterSavingId(null);
+    }
+  }
+
   if (checkingAdmin) {
     return (
       <main className="info-page">
@@ -324,6 +429,9 @@ export function AdminPageClient() {
         await legacyUnlock(attempt);
         setOrders(readOrders());
         applyAdminUsers([]);
+        setAdminCoupons([]);
+        setNewsletterSubscribers([]);
+        setAdminSettings(null);
         setApiMode('legacy');
         setUnlocked(true);
       } catch (err) {
@@ -753,6 +861,105 @@ export function AdminPageClient() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section className="info-block">
+              <h2>Operacao da loja</h2>
+              {adminSettings ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Marca</h5>
+                    <div className="meta">{adminSettings.store.appName} - {adminSettings.store.publicUrl}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Contato</h5>
+                    <div className="meta">{adminSettings.store.supportEmail} - {adminSettings.store.whatsapp || 'WhatsApp nao configurado'}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Mercado Pago</h5>
+                    <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'producao'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Email</h5>
+                    <div className="meta">{adminSettings.integrations.email.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.email.devMode ? 'modo dev' : 'envio real'} {adminSettings.integrations.email.user ? `- ${adminSettings.integrations.email.user}` : ''}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Melhor Envio</h5>
+                    <div className="meta">{adminSettings.integrations.melhorEnvio.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.melhorEnvio.env} - CEP origem {adminSettings.integrations.melhorEnvio.originCepConfigured ? 'ok' : 'pendente'}</div>
+                  </div>
+                </div>
+              ) : (
+                <p>Configuracoes reais aparecem aqui quando o admin estiver conectado ao backend.</p>
+              )}
+            </section>
+
+            <section className="info-block">
+              <h2>Cupons</h2>
+              <form className="form-block account-form" onSubmit={handleCouponSubmit} style={{ marginBottom: 24 }}>
+                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                  <div className="field">
+                    <label htmlFor="admin-coupon-code">Codigo</label>
+                    <input id="admin-coupon-code" value={couponForm.code} onChange={event => setCouponForm(current => ({ ...current, code: event.target.value }))} required />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-coupon-type">Tipo</label>
+                    <select id="admin-coupon-type" value={couponForm.discountType} onChange={event => setCouponForm(current => ({ ...current, discountType: event.target.value }))}>
+                      <option value="PERCENT">Percentual</option>
+                      <option value="FIXED">Valor fixo</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-coupon-value">Desconto</label>
+                    <input id="admin-coupon-value" type="number" min="1" value={couponForm.discountValue} onChange={event => setCouponForm(current => ({ ...current, discountValue: event.target.value }))} required />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-coupon-limit">Limite de uso</label>
+                    <input id="admin-coupon-limit" type="number" min="1" value={couponForm.maxRedemptions} onChange={event => setCouponForm(current => ({ ...current, maxRedemptions: event.target.value }))} />
+                  </div>
+                </div>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                  <input type="checkbox" checked={couponForm.active} onChange={event => setCouponForm(current => ({ ...current, active: event.target.checked }))} />
+                  Cupom ativo
+                </label>
+                {couponError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{couponError}</p> : null}
+                <button type="submit" className="btn btn-primary" style={{ marginTop: 18 }} disabled={couponSaving || apiMode !== 'real'}>
+                  {couponSaving ? 'Salvando...' : 'Criar cupom'}
+                </button>
+              </form>
+              <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                {adminCoupons.slice(0, 8).map(coupon => (
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={coupon.id}>
+                    <div>
+                      <h5>{coupon.code}</h5>
+                      <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos - {coupon.active ? 'ativo' : 'inativo'}</div>
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
+                      {coupon.active ? 'Desativar' : 'Ativar'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="info-block">
+              <h2>Newsletter</h2>
+              {newsletterSubscribers.length ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  {newsletterSubscribers.slice(0, 10).map(subscriber => (
+                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={subscriber.id}>
+                      <div>
+                        <h5>{subscriber.email}</h5>
+                        <div className="meta">{subscriber.source} - {subscriber.isActive ? 'ativo' : 'inativo'} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
+                      </div>
+                      <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
+                        {subscriber.isActive ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>Nenhum inscrito na newsletter ainda.</p>
+              )}
             </section>
           </article>
         </section>

@@ -111,6 +111,11 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname === '/api/admin/settings' && req.method === 'GET') {
+        sendJson(res, 200, { settings: repo.buildAdminSettings ? repo.buildAdminSettings(appConfig) : adminRepo.buildAdminSettings(appConfig) }, corsOrigin);
+        return true;
+      }
+
       if (url.pathname === '/api/admin/products' && req.method === 'GET') {
         sendJson(res, 200, await repo.listAdminProducts(), corsOrigin);
         return true;
