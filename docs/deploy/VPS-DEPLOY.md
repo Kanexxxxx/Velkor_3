@@ -250,12 +250,13 @@ Rode localmente e/ou na VPS:
 ```bash
 npm test
 npm run build
+npm run e2e --prefix frontend
 npm audit --prefix backend --audit-level=moderate
 npm audit --prefix frontend --audit-level=moderate
 cd backend && npx prisma validate --schema prisma/schema.prisma
 ```
 
-Tambem execute testes E2E de login, checkout, carrinho, navbar/footer e responsividade antes de liberar trafego pago.
+Os testes E2E cobrem login/cadastro, carrinho, checkout, navbar/footer e responsividade em desktop e mobile.
 
 ## 14. Rollback
 

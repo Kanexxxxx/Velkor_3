@@ -97,10 +97,11 @@ Use este checklist antes de abrir trafego real.
 
 - [ ] `npm test` passa.
 - [ ] `npm run build` passa.
+- [ ] `npm run e2e --prefix frontend` passa em desktop e mobile.
 - [ ] `npm audit --prefix backend --audit-level=moderate` sem vulnerabilidades moderadas/altas.
 - [ ] `npm audit --prefix frontend --audit-level=moderate` sem vulnerabilidades moderadas/altas.
 - [ ] `cd backend && npx prisma validate --schema prisma/schema.prisma` passa.
-- [ ] Testes E2E de login, checkout, carrinho, navbar/footer e responsividade executados antes de trafego pago.
+- [ ] Smoke real em producao executado depois do deploy.
 
 ## Rollback
 
