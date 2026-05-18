@@ -62,6 +62,17 @@ const emptyCouponForm = {
 type ProductFormState = typeof emptyProductForm;
 type CouponFormState = typeof emptyCouponForm;
 type UserFormState = Record<string, { name: string; email: string; role: AdminRole; emailVerified: boolean }>;
+type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'coupons' | 'newsletter' | 'settings';
+
+const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: string }> = [
+  { key: 'overview', label: 'Visao geral', description: 'Resumo da loja' },
+  { key: 'orders', label: 'Pedidos', description: 'Status e envio' },
+  { key: 'customers', label: 'Clientes', description: 'Contas e enderecos' },
+  { key: 'products', label: 'Produtos', description: 'Catalogo e imagens' },
+  { key: 'coupons', label: 'Cupons', description: 'Promocoes' },
+  { key: 'newsletter', label: 'Newsletter', description: 'Inscritos' },
+  { key: 'settings', label: 'Configuracoes', description: 'Integracoes' },
+];
 
 function fallbackToAdminProduct(product: Product): AdminProduct {
   return {
@@ -173,6 +184,7 @@ export function AdminPageClient() {
   const [loading, setLoading] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview');
 
   function applyAdminUsers(users: AdminUser[]) {
     setAdminUsers(users);
@@ -557,21 +569,29 @@ export function AdminPageClient() {
         <section className="info-layout">
           <aside className="info-nav">
             <div>
-              <h4>Catalogo</h4>
-              <Link href="/shop?cat=sneakers">Tenis ({categoryCounts.sneakers ?? 0})</Link>
-              <Link href="/shop?cat=apparel">Vestuario ({categoryCounts.apparel ?? 0})</Link>
-              <Link href="/shop?cat=accessories">Acessorios ({categoryCounts.accessories ?? 0})</Link>
+              <h4>Area admin</h4>
+              {ADMIN_SECTIONS.map(section => (
+                <button
+                  key={section.key}
+                  type="button"
+                  className={`admin-nav-button${activeSection === section.key ? ' active' : ''}`}
+                  onClick={() => setActiveSection(section.key)}
+                >
+                  <strong>{section.label}</strong>
+                  <span>{section.description}</span>
+                </button>
+              ))}
             </div>
             <div>
-              <h4>Operacao</h4>
+              <h4>Atalhos</h4>
+              <Link href="/shop?cat=sneakers">Tenis ({categoryCounts.sneakers ?? 0})</Link>
               <Link href="/checkout">Checkout</Link>
               <Link href={getInfoHref('track-order')}>Rastreio</Link>
-              <Link href={getInfoHref('refund-policy')}>Reembolso</Link>
             </div>
           </aside>
 
           <article className="info-content">
-            <section className="info-block">
+            <section className="info-block" hidden={!['overview', 'orders'].includes(activeSection)}>
               <h2>Pedidos recentes</h2>
               {orders.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
@@ -603,7 +623,7 @@ export function AdminPageClient() {
               )}
             </section>
 
-            <section className="info-block">
+            <section className="info-block" hidden={activeSection !== 'customers'}>
               <h2>Clientes</h2>
               {userError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 16 }}>{userError}</p> : null}
               {adminUsers.length ? (
@@ -685,7 +705,7 @@ export function AdminPageClient() {
               )}
             </section>
 
-            <section className="info-block">
+            <section className="info-block" hidden={activeSection !== 'products'}>
               <h2>Catalogo admin</h2>
               <form className="form-block account-form" onSubmit={handleProductSubmit} style={{ marginBottom: 28 }}>
                 <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
@@ -898,7 +918,7 @@ export function AdminPageClient() {
               </div>
             </section>
 
-            <section className="info-block">
+            <section className="info-block" hidden={!['overview', 'settings'].includes(activeSection)}>
               <h2>Operacao da loja</h2>
               {adminSettings ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
@@ -928,7 +948,7 @@ export function AdminPageClient() {
               )}
             </section>
 
-            <section className="info-block">
+            <section className="info-block" hidden={activeSection !== 'coupons'}>
               <h2>Cupons</h2>
               <form className="form-block account-form" onSubmit={handleCouponSubmit} style={{ marginBottom: 24 }}>
                 <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
@@ -976,7 +996,7 @@ export function AdminPageClient() {
               </div>
             </section>
 
-            <section className="info-block">
+            <section className="info-block" hidden={activeSection !== 'newsletter'}>
               <h2>Newsletter</h2>
               {newsletterSubscribers.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
