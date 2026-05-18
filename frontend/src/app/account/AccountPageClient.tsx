@@ -39,12 +39,12 @@ function formatDate(value: string) {
   }
 }
 
-export function AccountPageClient() {
+export function AccountPageClient({ initialTab = 'profile' }: { initialTab?: TabKey } = {}) {
   const { user, isAuthenticated, isReady, login, register, requestPasswordReset, logout } = useAuth();
   const { notify } = useNotifications();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabParam = (searchParams.get('tab') ?? 'profile') as TabKey;
+  const tabParam = (searchParams.get('tab') ?? initialTab) as TabKey;
   const tab = TABS.some(item => item.key === tabParam) ? tabParam : 'profile';
 
   if (!isReady) {
