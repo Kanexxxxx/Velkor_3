@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ShoppingBag, X } from 'lucide-react';
 import { useCart } from '@/components/cart/CartProvider';
 import { formatPrice, getProductById } from '@/services/products';
+import { useProductsById } from '@/services/useProductCatalog';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface CartDrawerProps {
 
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, summary, updateQuantity, removeItem } = useCart();
+  const { productsById } = useProductsById(items.map(item => item.productId));
 
   return (
     <>
@@ -40,7 +42,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             </div>
           ) : (
             items.map(item => {
-              const product = getProductById(item.productId);
+              const product = productsById[item.productId] ?? getProductById(item.productId);
               if (!product) return null;
 
               return (

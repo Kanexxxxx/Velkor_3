@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { addRemoteCartItem, fetchRemoteCart, removeRemoteCartItem, syncRemoteCart, updateRemoteCartItem } from '@/services/cartApi';
 import { CART_STORAGE_KEY, calculateCartSummary } from '@/services/cart';
-import { products } from '@/services/products';
+import { fetchCatalog, fallbackCatalog } from '@/services/productApi';
 import type { AddCartItemInput, CartItem, CartSummary } from '@/types/cart';
 
 interface CartContextValue {
@@ -43,6 +43,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState('');
   const [syncAttempt, setSyncAttempt] = useState(0);
+  const [prices, setPrices] = useState<Record<string, number>>(
+    () => Object.fromEntries(fallbackCatalog.products.map(product => [product.id, product.price]))
+  );
 
   useEffect(() => {
     setItems(readStoredCart());
@@ -76,14 +79,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [isReady, syncAttempt]);
 
   useEffect(() => {
+    let active = true;
+
+    fetchCatalog()
+      .then(catalog => {
+        if (!active) return;
+        setPrices(Object.fromEntries(catalog.products.map(product => [product.id, product.price])));
+      })
+      .catch(() => {
+        if (active) setSyncError('Nao foi possivel atualizar os precos do carrinho agora.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isReady) return;
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [isReady, items]);
-
-  const prices = useMemo(
-    () => Object.fromEntries(products.map(product => [product.id, product.price])),
-    []
-  );
 
   const summary = useMemo(() => calculateCartSummary(items, prices), [items, prices]);
 

@@ -83,3 +83,42 @@ export function useProductDetail(initialProduct: Product) {
 
   return { product, status, error, retry };
 }
+
+export function useProductsById(productIds: string[]) {
+  const [productsById, setProductsById] = useState<Record<string, Product>>({});
+  const [status, setStatus] = useState<LoadStatus>('idle');
+  const [error, setError] = useState('');
+  const normalizedIds = productIds.filter(Boolean).sort().join('|');
+
+  useEffect(() => {
+    const ids = normalizedIds ? normalizedIds.split('|') : [];
+    if (!ids.length) {
+      setProductsById({});
+      setStatus('ready');
+      setError('');
+      return;
+    }
+
+    let active = true;
+    setStatus('loading');
+    setError('');
+
+    Promise.all(ids.map(id => fetchProduct(id)))
+      .then(products => {
+        if (!active) return;
+        setProductsById(Object.fromEntries(products.map(product => [product.id, product])));
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (!active) return;
+        setStatus('error');
+        setError('Nao foi possivel carregar todos os produtos do carrinho.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [normalizedIds]);
+
+  return { productsById, status, error };
+}

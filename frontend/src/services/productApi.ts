@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/services/api';
 import type { Product, ProductCategory } from '@/types/product';
 import { products as fallbackProducts } from '@/services/products';
 
@@ -16,7 +17,6 @@ export interface CatalogState {
   source: CatalogSource;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const REQUEST_TIMEOUT_MS = 5000;
 const fallbackCategories: ApiCategory[] = [
   { id: 'cat_sneakers', slug: 'sneakers', name: 'Tenis' },
@@ -84,7 +84,7 @@ async function fetchJson<T>(path: string): Promise<T> {
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
       cache: 'no-store',
       signal: controller.signal
     });
