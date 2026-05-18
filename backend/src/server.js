@@ -10,6 +10,7 @@ const { quoteCartShipping } = require('./db/shipping');
 const { getSessionId } = require('./db/session');
 const authRepo = require('./db/auth');
 const { createAuthHandler, parseCookies } = require('./routes/auth');
+const { createAccountHandler } = require('./routes/account');
 const { createAdminHandler } = require('./routes/admin');
 const { createPaymentsHandler } = require('./routes/payments');
 const { sendOrderConfirmationIfNeeded } = require('./services/order-email');
@@ -47,6 +48,7 @@ for (const [key, value] of Object.entries(appConfig)) {
 }
 
 const handleAuthRequest = createAuthHandler();
+const handleAccountRequest = createAccountHandler();
 const emailClient = createEmailClient(appConfig);
 const handleAdminRequest = createAdminHandler({ appConfig, uploadRoot: UPLOAD_PRODUCTS_DIR, emailService: emailClient });
 const handlePaymentsRequest = createPaymentsHandler({ appConfig });
@@ -319,6 +321,7 @@ async function handleRequest(req, res) {
   }
 
   if (await handleAuthRequest(req, res, corsOrigin)) return;
+  if (await handleAccountRequest(req, res, corsOrigin)) return;
   if (await handleAdminRequest(req, res, corsOrigin)) return;
   if (await handlePaymentsRequest(req, res, corsOrigin)) return;
 
