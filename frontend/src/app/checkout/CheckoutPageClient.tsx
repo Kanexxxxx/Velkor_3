@@ -60,6 +60,38 @@ function BoletoIcon() {
   );
 }
 
+function ShippingMethodIcon({ name }: { name: string }) {
+  const normalizedName = name.toLowerCase();
+  if (normalizedName.includes('sedex')) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <path d="M3 7h10v10H3z" />
+        <path d="M13 10h4l4 4v3h-8z" />
+        <path d="M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z" />
+        <path d="M17.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z" />
+        <path d="M5 4h7" />
+        <path d="M3 10h5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M4 8 12 4l8 4-8 4-8-4Z" />
+      <path d="M4 8v8l8 4 8-4V8" />
+      <path d="M12 12v8" />
+      <path d="m8 6 8 4" />
+    </svg>
+  );
+}
+
+function shippingLabel(name: string) {
+  const normalizedName = name.toLowerCase();
+  if (normalizedName.includes('sedex')) return 'SEDEX';
+  if (normalizedName.includes('pac')) return 'PAC';
+  return name;
+}
+
 interface AddressForm {
   recipient: string;
   street: string;
@@ -548,8 +580,9 @@ export function CheckoutPageClient() {
                         hidden
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                        <ShippingMethodIcon name={option.name} />
                         <div style={{ textAlign: 'left' }}>
-                          <b style={{ fontFamily: 'var(--font-head)', fontSize: 13, display: 'block' }}>{option.name}</b>
+                          <b style={{ fontFamily: 'var(--font-head)', fontSize: 13, display: 'block' }}>{shippingLabel(option.name)}</b>
                           <span>{option.deliveryTime ? `${option.deliveryTime} dias uteis` : 'Prazo sob consulta'}</span>
                         </div>
                         <b className="mono" style={{ fontSize: 14 }}>{option.price ? formatPrice(option.price) : 'GRATIS'}</b>

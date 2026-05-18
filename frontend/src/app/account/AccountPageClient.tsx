@@ -540,7 +540,7 @@ function OrdersPanel({ orders, loading, error, onRetry }: {
                 </div>
                 <dl className="order-grid">
                   <div><dt>Pagamento</dt><dd>{paymentLabel(payment)}</dd></div>
-                  <div><dt>Entrega</dt><dd>{shipping === 'express' ? 'Expressa' : 'Padrão'}</dd></div>
+                  <div><dt>Entrega</dt><dd>{shippingMethodLabel(shipping)}</dd></div>
                   <div><dt>Frete</dt><dd>{shippingCost ? formatPrice(shippingCost) : 'Grátis'}</dd></div>
                   <div><dt>Imposto estimado</dt><dd>{formatPrice(tax)}</dd></div>
                   {discount > 0 ? <div><dt>Desconto</dt><dd>-{formatPrice(discount)}</dd></div> : null}
@@ -563,6 +563,14 @@ function paymentLabel(payment: string | undefined) {
     case 'boleto': return 'Boleto';
     default: return payment;
   }
+}
+
+function shippingMethodLabel(shipping: string | undefined) {
+  const value = String(shipping || '').toLowerCase();
+  if (value.includes('sedex')) return 'SEDEX';
+  if (value.includes('pac')) return 'PAC';
+  if (value === 'express') return 'Expressa';
+  return 'Padrão';
 }
 
 function AddressesPanel() {
