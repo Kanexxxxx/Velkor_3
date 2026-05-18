@@ -59,7 +59,13 @@ test('mercado pago client uses real sandbox preference when dev mode has access 
         totalCents: 4590,
         contactName: 'Kaina Rodrigues',
         email: 'kaina@example.com',
-        items: [{ name: 'Produto VELKOR', quantity: 1, unitPriceCents: 4590 }],
+        contactPhone: '16991557552',
+        shippingAddress: {
+          street: 'Rua Jurua',
+          number: '123',
+          postalCode: '14030410',
+        },
+        items: [{ productId: 'produto-1', name: 'Produto VELKOR', category: 'sneakers', quantity: 1, unitPriceCents: 4590 }],
       },
     });
 
@@ -67,7 +73,16 @@ test('mercado pago client uses real sandbox preference when dev mode has access 
     assert.equal(preference.initPoint, 'https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_real_test');
     assert.equal(preference.sandbox, true);
     assert.equal(requestBody.external_reference, 'ord_2');
+    assert.equal(requestBody.items[0].id, 'produto-1');
+    assert.equal(requestBody.items[0].title, 'Produto VELKOR');
+    assert.equal(requestBody.items[0].description, 'Produto VELKOR');
+    assert.equal(requestBody.items[0].category_id, 'fashion');
     assert.equal(requestBody.items[0].unit_price, 45.9);
+    assert.equal(requestBody.payer.email, 'kaina@example.com');
+    assert.equal(requestBody.payer.first_name, 'Kaina');
+    assert.equal(requestBody.payer.last_name, 'Rodrigues');
+    assert.equal(requestBody.payer.phone.area_code, '16');
+    assert.equal(requestBody.payer.address.zip_code, '14030410');
   } finally {
     global.fetch = originalFetch;
   }
