@@ -81,7 +81,7 @@ function normalizeCategory(value: unknown): ApiCategory | null {
 
 async function fetchJson<T>(path: string): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -91,7 +91,7 @@ async function fetchJson<T>(path: string): Promise<T> {
     if (!response.ok) throw new Error(`API respondeu ${response.status}`);
     return await response.json() as T;
   } finally {
-    window.clearTimeout(timeout);
+    clearTimeout(timeout);
   }
 }
 
