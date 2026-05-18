@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const crypto = require('crypto');
 
 test('payments map mercado pago statuses to internal payment and order status', () => {
   const { mapMercadoPagoStatus } = require('../src/db/payments');
@@ -89,4 +90,57 @@ test('payments route rejects webhook when configured secret is invalid', async (
 
   assert.equal(await handler(req, res, null), true);
   assert.equal(res.statusCode, 401);
+});
+
+test('payments route accepts Mercado Pago signed webhook notifications', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const secret = 'mp-webhook-secret';
+  const dataId = '123456789';
+  const requestId = 'bb56a2f1-6aae-46ac-982e-9dcd3581d08e';
+  const ts = '1742505638683';
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(`id:${dataId};request-id:${requestId};ts:${ts};`)
+    .digest('hex');
+  const req = require('node:stream').Readable.from([JSON.stringify({
+    action: 'payment.updated',
+    data: { id: dataId },
+    type: 'payment',
+  })]);
+  req.method = 'POST';
+  req.url = `/api/payments/webhook?data.id=${dataId}&type=payment`;
+  req.headers = {
+    host: 'localhost:3001',
+    'x-request-id': requestId,
+    'x-signature': `ts=${ts},v1=${signature}`,
+  };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const processed = [];
+  const handler = createPaymentsHandler({
+    appConfig: { MERCADO_PAGO_WEBHOOK_SECRET: secret },
+    mercadoPago: {
+      getPayment: async id => {
+        assert.equal(id, dataId);
+        return { status: 'approved', external_reference: 'order_1' };
+      },
+    },
+    repo: {
+      processPaymentWebhook: async payload => {
+        processed.push(payload);
+        return { processed: true, duplicate: false, storage: 'database' };
+      },
+    },
+  });
+
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(processed[0].externalId, dataId);
+  assert.equal(processed[0].status, 'approved');
+  assert.equal(processed[0].orderId, 'order_1');
 });
