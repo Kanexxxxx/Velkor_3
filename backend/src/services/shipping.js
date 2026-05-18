@@ -38,6 +38,19 @@ function mapQuote(raw) {
   };
 }
 
+function parseAllowedServices(value) {
+  return String(value || '1,2')
+    .split(',')
+    .map(item => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAllowedService(raw, allowedServices) {
+  const id = String(raw?.id || '').toLowerCase();
+  const name = String(raw?.name || '').toLowerCase();
+  return allowedServices.includes(id) || allowedServices.includes(name);
+}
+
 function buildProducts(items, subtotalCents) {
   const insuranceValue = Math.max(1, Math.round(Number(subtotalCents || 0) / 100));
   return (items || []).map((item, index) => ({
@@ -55,6 +68,7 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
   const accessToken = env.MELHOR_ENVIO_ACCESS_TOKEN || '';
   const originPostalCode = cleanPostalCode(env.MELHOR_ENVIO_ORIGIN_CEP);
   const devFallback = boolEnv(env.MELHOR_ENVIO_DEV_FALLBACK ?? 'false');
+  const allowedServices = parseAllowedServices(env.MELHOR_ENVIO_ALLOWED_SERVICES);
 
   async function quoteShipping({ toPostalCode, items, subtotalCents }) {
     const destinationPostalCode = cleanPostalCode(toPostalCode);
@@ -99,7 +113,10 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
       throw error;
     }
 
-    const quotes = (Array.isArray(data) ? data : []).map(mapQuote).filter(Boolean);
+    const quotes = (Array.isArray(data) ? data : [])
+      .filter(item => isAllowedService(item, allowedServices))
+      .map(mapQuote)
+      .filter(Boolean);
     if (!quotes.length) {
       const error = new Error('Nenhuma opcao de frete disponivel para este CEP.');
       error.statusCode = 422;
@@ -112,4 +129,4 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
   return { quoteShipping };
 }
 
-module.exports = { cleanPostalCode, createShippingClient, mapQuote };
+module.exports = { cleanPostalCode, createShippingClient, isAllowedService, mapQuote, parseAllowedServices };
