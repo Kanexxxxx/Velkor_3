@@ -23,6 +23,17 @@ function makeFallbackQuote() {
   };
 }
 
+function makeFreeShippingQuote() {
+  return {
+    id: 'free-shipping',
+    provider: 'store',
+    name: 'Frete gratis',
+    price: 0,
+    priceCents: 0,
+    deliveryTime: 0,
+  };
+}
+
 function parseMarkupCents(value) {
   if (value === undefined || value === null || value === '') return 1500;
   const parsed = Number(value);
@@ -32,6 +43,20 @@ function parseMarkupCents(value) {
 
 function centsToMoney(cents) {
   return Number((Number(cents || 0) / 100).toFixed(2));
+}
+
+function parseFreeShippingProductIds(value) {
+  return new Set(String(value || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean));
+}
+
+function hasOnlyFreeShippingProducts(items, freeShippingProductIds) {
+  return Array.isArray(items) &&
+    items.length > 0 &&
+    freeShippingProductIds.size > 0 &&
+    items.every(item => freeShippingProductIds.has(String(item.productId || '')));
 }
 
 function mapQuote(raw, options = {}) {
@@ -83,6 +108,7 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
   const devFallback = boolEnv(env.MELHOR_ENVIO_DEV_FALLBACK ?? 'false');
   const allowedServices = parseAllowedServices(env.MELHOR_ENVIO_ALLOWED_SERVICES);
   const markupCents = parseMarkupCents(env.MELHOR_ENVIO_PRICE_MARKUP_CENTS);
+  const freeShippingProductIds = parseFreeShippingProductIds(env.FREE_SHIPPING_PRODUCT_IDS || env.MELHOR_ENVIO_FREE_SHIPPING_PRODUCT_IDS);
 
   async function quoteShipping({ toPostalCode, items, subtotalCents }) {
     const destinationPostalCode = cleanPostalCode(toPostalCode);
@@ -90,6 +116,10 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
       const error = new Error('CEP invalido.');
       error.statusCode = 400;
       throw error;
+    }
+
+    if (hasOnlyFreeShippingProducts(items, freeShippingProductIds)) {
+      return { quotes: [makeFreeShippingQuote()], storage: 'free-shipping' };
     }
 
     if (!accessToken || originPostalCode.length !== 8) {
@@ -143,4 +173,13 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
   return { quoteShipping };
 }
 
-module.exports = { cleanPostalCode, createShippingClient, isAllowedService, mapQuote, parseAllowedServices, parseMarkupCents };
+module.exports = {
+  cleanPostalCode,
+  createShippingClient,
+  hasOnlyFreeShippingProducts,
+  isAllowedService,
+  mapQuote,
+  parseAllowedServices,
+  parseFreeShippingProductIds,
+  parseMarkupCents,
+};

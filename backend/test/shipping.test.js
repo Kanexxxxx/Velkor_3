@@ -60,6 +60,30 @@ test('shipping client allows configuring the Melhor Envio quote markup', async (
   assert.equal(result.quotes[0].priceCents, 2690);
 });
 
+test('shipping client returns free shipping for configured product ids', async () => {
+  const { createShippingClient } = require('../src/services/shipping');
+  const client = createShippingClient({
+    MELHOR_ENVIO_ACCESS_TOKEN: 'token',
+    MELHOR_ENVIO_ORIGIN_CEP: '14000-000',
+    FREE_SHIPPING_PRODUCT_IDS: 'teste-10-sem-frete',
+  }, {
+    fetchImpl: async () => {
+      throw new Error('Melhor Envio should not be called for free shipping products');
+    },
+  });
+
+  const result = await client.quoteShipping({
+    toPostalCode: '14030-410',
+    items: [{ productId: 'teste-10-sem-frete', quantity: 1, unitPriceCents: 1000 }],
+    subtotalCents: 1000,
+  });
+
+  assert.deepEqual(result, {
+    quotes: [{ id: 'free-shipping', provider: 'store', name: 'Frete gratis', price: 0, priceCents: 0, deliveryTime: 0 }],
+    storage: 'free-shipping',
+  });
+});
+
 test('shipping client can filter services by environment allowlist', async () => {
   const { createShippingClient } = require('../src/services/shipping');
   const client = createShippingClient({
