@@ -37,9 +37,9 @@ interface AuthContextValue {
   resetPassword: (input: { token: string; password: string }) => Promise<User>;
   updateProfile: (patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => User;
   changePassword: (input: { currentPassword: string; nextPassword: string }) => Promise<void>;
-  upsertAddress: (input: Omit<Address, 'id'> & { id?: string }) => User;
-  removeAddress: (addressId: string) => User;
-  makeAddressDefault: (addressId: string) => User;
+  upsertAddress: (input: Omit<Address, 'id'> & { id?: string }) => Promise<User>;
+  removeAddress: (addressId: string) => Promise<User>;
+  makeAddressDefault: (addressId: string) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -224,8 +224,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshFromStorage();
   }, [refreshFromStorage, user]);
 
-  const upsertAddressFor = useCallback<AuthContextValue['upsertAddress']>(input => {
+  const upsertAddressFor = useCallback<AuthContextValue['upsertAddress']>(async input => {
     if (!user) throw new Error('Voce precisa estar logado.');
+    try {
+      const remote = await authApi.upsertAddress(input);
+      const nextUser = { ...user, addresses: remote.addresses };
+      setUser(nextUser);
+      return nextUser;
+    } catch (error) {
+      if (!authApi.isAuthApiUnavailable(error)) throw error;
+    }
+
     const updated = upsertAddress(user.id, input);
     if (!updated) throw new Error('Conta nao encontrada.');
     const publicData = publicUser(updated);
@@ -233,8 +242,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return publicData;
   }, [user]);
 
-  const removeAddress = useCallback<AuthContextValue['removeAddress']>(addressId => {
+  const removeAddress = useCallback<AuthContextValue['removeAddress']>(async addressId => {
     if (!user) throw new Error('Voce precisa estar logado.');
+    try {
+      const remote = await authApi.deleteAddress(addressId);
+      const nextUser = { ...user, addresses: remote.addresses };
+      setUser(nextUser);
+      return nextUser;
+    } catch (error) {
+      if (!authApi.isAuthApiUnavailable(error)) throw error;
+    }
+
     const updated = deleteAddress(user.id, addressId);
     if (!updated) throw new Error('Conta nao encontrada.');
     const publicData = publicUser(updated);
@@ -242,8 +260,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return publicData;
   }, [user]);
 
-  const makeAddressDefault = useCallback<AuthContextValue['makeAddressDefault']>(addressId => {
+  const makeAddressDefault = useCallback<AuthContextValue['makeAddressDefault']>(async addressId => {
     if (!user) throw new Error('Voce precisa estar logado.');
+    try {
+      const remote = await authApi.setDefaultAddress(addressId);
+      const nextUser = { ...user, addresses: remote.addresses };
+      setUser(nextUser);
+      return nextUser;
+    } catch (error) {
+      if (!authApi.isAuthApiUnavailable(error)) throw error;
+    }
+
     const updated = setDefaultAddress(user.id, addressId);
     if (!updated) throw new Error('Conta nao encontrada.');
     const publicData = publicUser(updated);

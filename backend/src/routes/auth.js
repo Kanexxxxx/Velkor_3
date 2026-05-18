@@ -292,6 +292,45 @@ function createAuthHandler(repo = authRepo, options = {}) {
         return true;
       }
 
+      if (url.pathname === '/api/auth/addresses' && req.method === 'POST') {
+        const current = await requireAuth(req, res, corsOrigin);
+        if (!current) return true;
+        const payload = await readJson(req);
+        const result = await repo.upsertUserAddress(current.user.id, payload);
+        if (!result) {
+          sendJson(res, 400, { error: 'Endereco invalido.' }, corsOrigin);
+          return true;
+        }
+        sendJson(res, 200, { address: result.address, addresses: result.addresses }, corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/auth/addresses/') && req.method === 'DELETE') {
+        const current = await requireAuth(req, res, corsOrigin);
+        if (!current) return true;
+        const id = decodeURIComponent(url.pathname.replace('/api/auth/addresses/', '')).trim();
+        const addresses = await repo.deleteUserAddress(current.user.id, id);
+        if (!addresses) {
+          sendJson(res, 404, { error: 'Endereco nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        sendJson(res, 200, { addresses }, corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/auth/addresses/') && url.pathname.endsWith('/default') && req.method === 'POST') {
+        const current = await requireAuth(req, res, corsOrigin);
+        if (!current) return true;
+        const id = decodeURIComponent(url.pathname.replace('/api/auth/addresses/', '').replace('/default', '')).trim();
+        const addresses = await repo.setDefaultUserAddress(current.user.id, id);
+        if (!addresses) {
+          sendJson(res, 404, { error: 'Endereco nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        sendJson(res, 200, { addresses }, corsOrigin);
+        return true;
+      }
+
       if (url.pathname === '/api/auth/sessions' && req.method === 'GET') {
         const current = await requireAuth(req, res, corsOrigin);
         if (!current) return true;

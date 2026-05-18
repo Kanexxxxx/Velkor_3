@@ -410,7 +410,7 @@ function ProfilePanel() {
 
   if (!user) return null;
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
       updateProfile(form);
@@ -581,7 +581,7 @@ function AddressesPanel() {
 
   if (!user) return null;
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const payload: Omit<Address, 'id'> & { id?: string } = {
@@ -599,7 +599,7 @@ function AddressesPanel() {
     };
 
     try {
-      upsertAddress(payload);
+      await upsertAddress(payload);
       notify(editing ? 'Endereço atualizado.' : 'Endereço salvo.', 'success');
       setEditing(null);
       setOpen(false);
@@ -647,11 +647,11 @@ function AddressesPanel() {
               <div className="address-card-actions">
                 <button type="button" onClick={() => { setEditing(address); setOpen(true); }}>Editar</button>
                 {!address.isDefault ? (
-                  <button type="button" onClick={() => { makeAddressDefault(address.id); notify('Endereço padrão atualizado.', 'success'); }}>
+                  <button type="button" onClick={async () => { await makeAddressDefault(address.id); notify('Endereço padrão atualizado.', 'success'); }}>
                     Tornar padrão
                   </button>
                 ) : null}
-                <button type="button" className="danger" onClick={() => { removeAddress(address.id); notify('Endereço removido.', 'info'); }}>
+                <button type="button" className="danger" onClick={async () => { await removeAddress(address.id); notify('Endereço removido.', 'info'); }}>
                   Remover
                 </button>
               </div>

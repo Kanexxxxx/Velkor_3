@@ -294,7 +294,7 @@ export function CheckoutPageClient() {
 
       if (user && saveAddress && selectedAddressId === 'new') {
         try {
-          const updated = upsertAddress({
+          const updated = await upsertAddress({
             ...address,
             isDefault: user.addresses.length === 0
           });
