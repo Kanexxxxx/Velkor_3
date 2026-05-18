@@ -30,6 +30,23 @@ function toPublicUser(user) {
     name: user.name ?? null,
     role: user.role,
     emailVerified: Boolean(user.emailVerified),
+    addresses: Array.isArray(user.addresses) ? user.addresses.map(toPublicAddress) : [],
+  };
+}
+
+function toPublicAddress(address) {
+  return {
+    id: address.id,
+    label: address.label || 'Endereco',
+    recipient: address.fullName,
+    street: address.street,
+    complement: address.complement || undefined,
+    city: address.city,
+    region: address.state,
+    postalCode: address.postalCode,
+    country: address.country || 'Brasil',
+    phone: address.phone || undefined,
+    isDefault: Boolean(address.isDefault),
   };
 }
 
@@ -61,7 +78,7 @@ async function findSessionUser(rawToken) {
 
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashSessionToken(rawToken) },
-    include: { user: true },
+    include: { user: { include: { addresses: { orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] } } } },
   });
 
   if (!session) return null;
@@ -113,7 +130,7 @@ async function revokeSession(userId, id) {
 async function findUserByEmail(email) {
   const prisma = getPrisma();
   if (!prisma) return null;
-  return prisma.user.findUnique({ where: { email } });
+  return prisma.user.findUnique({ where: { email }, include: { addresses: { orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] } } });
 }
 
 async function createUser({ email, password, name }) {
@@ -143,6 +160,87 @@ async function updateUserPassword(userId, password) {
     where: { id: userId },
     data: { passwordHash: await hashPassword(password) },
   });
+}
+
+function normalizeAddressInput(input = {}) {
+  const street = String(input.street || '').trim();
+  const recipient = String(input.recipient || '').trim();
+  const city = String(input.city || '').trim();
+  const region = String(input.region || '').trim();
+  const postalCode = String(input.postalCode || '').trim();
+  if (!recipient || !street || !city || !region || !postalCode) return null;
+  return {
+    label: String(input.label || 'Endereco').trim().slice(0, 80) || 'Endereco',
+    fullName: recipient.slice(0, 120),
+    phone: String(input.phone || '').trim().slice(0, 40) || null,
+    postalCode: postalCode.slice(0, 20),
+    street: street.slice(0, 180),
+    number: 'S/N',
+    complement: String(input.complement || '').trim().slice(0, 180) || null,
+    city: city.slice(0, 100),
+    state: region.slice(0, 40),
+    country: String(input.country || 'Brasil').trim().slice(0, 80) || 'Brasil',
+    isDefault: Boolean(input.isDefault),
+  };
+}
+
+async function upsertUserAddress(userId, input) {
+  const prisma = getPrisma();
+  if (!prisma) return null;
+  const data = normalizeAddressInput(input);
+  if (!data) return null;
+  const addressId = typeof input.id === 'string' ? input.id.trim() : '';
+
+  return prisma.$transaction(async tx => {
+    if (data.isDefault) {
+      await tx.address.updateMany({ where: { userId }, data: { isDefault: false } });
+    }
+
+    let address;
+    if (addressId) {
+      address = await tx.address.findFirst({ where: { id: addressId, userId } });
+      if (!address) return null;
+      address = await tx.address.update({ where: { id: address.id }, data });
+    } else {
+      address = await tx.address.create({ data: { ...data, userId } });
+    }
+
+    const addresses = await tx.address.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    if (!addresses.some(item => item.isDefault) && addresses[0]) {
+      await tx.address.update({ where: { id: addresses[0].id }, data: { isDefault: true } });
+    }
+
+    return { address: toPublicAddress(address), addresses: (await tx.address.findMany({ where: { userId }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] })).map(toPublicAddress) };
+  });
+}
+
+async function deleteUserAddress(userId, addressId) {
+  const prisma = getPrisma();
+  if (!prisma) return null;
+  const address = await prisma.address.findFirst({ where: { id: addressId, userId } });
+  if (!address) return null;
+  await prisma.address.delete({ where: { id: address.id } });
+  const addresses = await prisma.address.findMany({ where: { userId }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] });
+  if (!addresses.some(item => item.isDefault) && addresses[0]) {
+    await prisma.address.update({ where: { id: addresses[0].id }, data: { isDefault: true } });
+  }
+  return (await prisma.address.findMany({ where: { userId }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] })).map(toPublicAddress);
+}
+
+async function setDefaultUserAddress(userId, addressId) {
+  const prisma = getPrisma();
+  if (!prisma) return null;
+  const address = await prisma.address.findFirst({ where: { id: addressId, userId } });
+  if (!address) return null;
+  await prisma.$transaction([
+    prisma.address.updateMany({ where: { userId }, data: { isDefault: false } }),
+    prisma.address.update({ where: { id: address.id }, data: { isDefault: true } }),
+  ]);
+  return (await prisma.address.findMany({ where: { userId }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] })).map(toPublicAddress);
 }
 
 async function createPasswordResetToken(email) {
@@ -217,7 +315,7 @@ async function consumePasswordResetToken(rawToken, newPassword) {
 
   if (!resetToken || resetToken.usedAt || resetToken.expiresAt.getTime() < Date.now()) return false;
 
-  await prisma.$transaction([
+  const [user] = await prisma.$transaction([
     prisma.user.update({
       where: { id: resetToken.userId },
       data: { passwordHash: await hashPassword(newPassword) },
@@ -229,7 +327,7 @@ async function consumePasswordResetToken(rawToken, newPassword) {
     prisma.session.deleteMany({ where: { userId: resetToken.userId } }),
   ]);
 
-  return true;
+  return user;
 }
 
 module.exports = {
@@ -249,7 +347,10 @@ module.exports = {
   hashSessionToken,
   listSessions,
   revokeSession,
+  deleteUserAddress,
+  setDefaultUserAddress,
   toPublicUser,
+  upsertUserAddress,
   updateUserPassword,
   updateUserProfile,
   verifyPassword,

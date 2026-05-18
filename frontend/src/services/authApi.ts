@@ -1,4 +1,4 @@
-import type { User } from '@/types/user';
+import type { Address, User } from '@/types/user';
 
 export interface AuthApiUser {
   id: string;
@@ -6,6 +6,7 @@ export interface AuthApiUser {
   name: string | null;
   role: string;
   emailVerified: boolean;
+  addresses?: Address[];
 }
 
 export interface SessionInfo {
@@ -35,7 +36,7 @@ function toUser(user: AuthApiUser): User {
     email: user.email,
     emailVerified: user.emailVerified,
     createdAt: new Date().toISOString(),
-    addresses: [],
+    addresses: Array.isArray(user.addresses) ? user.addresses : [],
   };
 }
 
@@ -124,6 +125,21 @@ export async function revokeAllSessions() {
   await request<{ ok: true; revoked: number }>('/sessions', { method: 'DELETE' });
 }
 
+export async function upsertAddress(address: Omit<Address, 'id'> & { id?: string }) {
+  return request<{ address: Address; addresses: Address[] }>('/addresses', {
+    method: 'POST',
+    body: JSON.stringify(address),
+  });
+}
+
+export async function deleteAddress(id: string) {
+  return request<{ addresses: Address[] }>(`/addresses/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function setDefaultAddress(id: string) {
+  return request<{ addresses: Address[] }>(`/addresses/${encodeURIComponent(id)}/default`, { method: 'POST' });
+}
+
 export async function requestPasswordReset(email: string) {
   await request<{ ok: true }>('/password-reset/request', {
     method: 'POST',
@@ -136,10 +152,11 @@ export async function requestEmailVerification() {
 }
 
 export async function confirmPasswordReset(token: string, newPassword: string) {
-  await request<{ ok: true }>('/password-reset/confirm', {
+  const data = await request<{ ok: true; user?: AuthApiUser }>('/password-reset/confirm', {
     method: 'POST',
     body: JSON.stringify({ token, newPassword }),
   });
+  return data.user ? mapUserResponse({ user: data.user }) : null;
 }
 
 export async function confirmEmailVerification(token: string) {

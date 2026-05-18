@@ -410,7 +410,7 @@ function ProfilePanel() {
 
   if (!user) return null;
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
       updateProfile(form);
@@ -540,7 +540,7 @@ function OrdersPanel({ orders, loading, error, onRetry }: {
                 </div>
                 <dl className="order-grid">
                   <div><dt>Pagamento</dt><dd>{paymentLabel(payment)}</dd></div>
-                  <div><dt>Entrega</dt><dd>{shipping === 'express' ? 'Expressa' : 'Padrão'}</dd></div>
+                  <div><dt>Entrega</dt><dd>{shippingMethodLabel(shipping)}</dd></div>
                   <div><dt>Frete</dt><dd>{shippingCost ? formatPrice(shippingCost) : 'Grátis'}</dd></div>
                   <div><dt>Imposto estimado</dt><dd>{formatPrice(tax)}</dd></div>
                   {discount > 0 ? <div><dt>Desconto</dt><dd>-{formatPrice(discount)}</dd></div> : null}
@@ -565,6 +565,14 @@ function paymentLabel(payment: string | undefined) {
   }
 }
 
+function shippingMethodLabel(shipping: string | undefined) {
+  const value = String(shipping || '').toLowerCase();
+  if (value.includes('sedex')) return 'SEDEX';
+  if (value.includes('pac')) return 'PAC';
+  if (value === 'express') return 'Expressa';
+  return 'Padrão';
+}
+
 function AddressesPanel() {
   const { user, upsertAddress, removeAddress, makeAddressDefault } = useAuth();
   const { notify } = useNotifications();
@@ -573,7 +581,7 @@ function AddressesPanel() {
 
   if (!user) return null;
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const payload: Omit<Address, 'id'> & { id?: string } = {
@@ -591,7 +599,7 @@ function AddressesPanel() {
     };
 
     try {
-      upsertAddress(payload);
+      await upsertAddress(payload);
       notify(editing ? 'Endereço atualizado.' : 'Endereço salvo.', 'success');
       setEditing(null);
       setOpen(false);
@@ -639,11 +647,11 @@ function AddressesPanel() {
               <div className="address-card-actions">
                 <button type="button" onClick={() => { setEditing(address); setOpen(true); }}>Editar</button>
                 {!address.isDefault ? (
-                  <button type="button" onClick={() => { makeAddressDefault(address.id); notify('Endereço padrão atualizado.', 'success'); }}>
+                  <button type="button" onClick={async () => { await makeAddressDefault(address.id); notify('Endereço padrão atualizado.', 'success'); }}>
                     Tornar padrão
                   </button>
                 ) : null}
-                <button type="button" className="danger" onClick={() => { removeAddress(address.id); notify('Endereço removido.', 'info'); }}>
+                <button type="button" className="danger" onClick={async () => { await removeAddress(address.id); notify('Endereço removido.', 'info'); }}>
                   Remover
                 </button>
               </div>

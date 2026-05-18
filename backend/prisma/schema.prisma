@@ -219,6 +219,7 @@ model Address {
   user         User?    @relation(fields: [userId], references: [id])
   fullName     String
   phone        String?
+  label        String   @default("Endereco")
   postalCode   String
   street       String
   number       String
@@ -227,11 +228,13 @@ model Address {
   city         String
   state        String
   country      String   @default("BR")
+  isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   orders       Order[]
 
   @@index([userId])
+  @@index([userId, isDefault])
 }
 
 model NewsletterSubscriber {

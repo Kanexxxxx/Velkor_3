@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ArrowRight, Star } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { trackEvent } from '@/components/Analytics';
@@ -9,19 +10,7 @@ import { useProductCatalog } from '@/services/useProductCatalog';
 import type { Product } from '@/types/product';
 
 function ArrowIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size} aria-hidden="true">
-      <path d="M5 12h14M13 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-function StarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z" />
-    </svg>
-  );
+  return <ArrowRight width={size} height={size} aria-hidden="true" />;
 }
 
 const marqueeText = (
@@ -245,7 +234,7 @@ export default function HomePage() {
             {testimonials.map(testimonial => (
               <article className="testimonial" key={testimonial.name}>
                 <div className="testimonial-stars">
-                  {Array.from({ length: 5 }).map((_, index) => <StarIcon key={index} />)}
+                  {Array.from({ length: 5 }).map((_, index) => <Star fill="currentColor" key={index} aria-hidden="true" />)}
                 </div>
                 <p className="testimonial-text">&ldquo;{testimonial.text}&rdquo;</p>
                 <div className="testimonial-user">

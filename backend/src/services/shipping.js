@@ -23,17 +23,30 @@ function makeFallbackQuote() {
   };
 }
 
-function mapQuote(raw) {
+function parseMarkupCents(value) {
+  if (value === undefined || value === null || value === '') return 1500;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.round(parsed);
+}
+
+function centsToMoney(cents) {
+  return Number((Number(cents || 0) / 100).toFixed(2));
+}
+
+function mapQuote(raw, options = {}) {
   if (!raw || raw.error) return null;
   const price = Number(raw.price);
   if (!Number.isFinite(price) || price < 0) return null;
   const id = raw.id ? `melhor-envio:${raw.id}` : `melhor-envio:${String(raw.name || 'servico').toLowerCase()}`;
+  const basePriceCents = Math.round(price * 100);
+  const priceCents = basePriceCents + parseMarkupCents(options.markupCents);
   return {
     id,
     provider: 'melhor-envio',
     name: String(raw.name || 'Entrega'),
-    price,
-    priceCents: Math.round(price * 100),
+    price: centsToMoney(priceCents),
+    priceCents,
     deliveryTime: Number(raw.delivery_time || raw.deliveryTime || 0),
   };
 }
@@ -69,6 +82,7 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
   const originPostalCode = cleanPostalCode(env.MELHOR_ENVIO_ORIGIN_CEP);
   const devFallback = boolEnv(env.MELHOR_ENVIO_DEV_FALLBACK ?? 'false');
   const allowedServices = parseAllowedServices(env.MELHOR_ENVIO_ALLOWED_SERVICES);
+  const markupCents = parseMarkupCents(env.MELHOR_ENVIO_PRICE_MARKUP_CENTS);
 
   async function quoteShipping({ toPostalCode, items, subtotalCents }) {
     const destinationPostalCode = cleanPostalCode(toPostalCode);
@@ -115,7 +129,7 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
 
     const quotes = (Array.isArray(data) ? data : [])
       .filter(item => isAllowedService(item, allowedServices))
-      .map(mapQuote)
+      .map(item => mapQuote(item, { markupCents }))
       .filter(Boolean);
     if (!quotes.length) {
       const error = new Error('Nenhuma opcao de frete disponivel para este CEP.');
@@ -129,4 +143,4 @@ function createShippingClient(env = process.env, { fetchImpl = fetch } = {}) {
   return { quoteShipping };
 }
 
-module.exports = { cleanPostalCode, createShippingClient, isAllowedService, mapQuote, parseAllowedServices };
+module.exports = { cleanPostalCode, createShippingClient, isAllowedService, mapQuote, parseAllowedServices, parseMarkupCents };

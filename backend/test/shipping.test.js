@@ -30,9 +30,34 @@ test('shipping client maps Melhor Envio responses into checkout quotes', async (
   });
 
   assert.deepEqual(result.quotes, [
-    { id: 'melhor-envio:1', provider: 'melhor-envio', name: 'PAC', price: 19.9, priceCents: 1990, deliveryTime: 6 },
-    { id: 'melhor-envio:2', provider: 'melhor-envio', name: 'SEDEX', price: 12.82, priceCents: 1282, deliveryTime: 3 },
+    { id: 'melhor-envio:1', provider: 'melhor-envio', name: 'PAC', price: 34.9, priceCents: 3490, deliveryTime: 6 },
+    { id: 'melhor-envio:2', provider: 'melhor-envio', name: 'SEDEX', price: 27.82, priceCents: 2782, deliveryTime: 3 },
   ]);
+});
+
+test('shipping client allows configuring the Melhor Envio quote markup', async () => {
+  const { createShippingClient } = require('../src/services/shipping');
+  const client = createShippingClient({
+    MELHOR_ENVIO_ACCESS_TOKEN: 'token',
+    MELHOR_ENVIO_ORIGIN_CEP: '14000-000',
+    MELHOR_ENVIO_PRICE_MARKUP_CENTS: '700',
+  }, {
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => [
+        { id: 1, name: 'PAC', price: '19.90', delivery_time: 6 },
+      ],
+    }),
+  });
+
+  const result = await client.quoteShipping({
+    toPostalCode: '14030-410',
+    items: [{ productId: 'v01', quantity: 1, unitPriceCents: 10000 }],
+    subtotalCents: 10000,
+  });
+
+  assert.equal(result.quotes[0].price, 26.9);
+  assert.equal(result.quotes[0].priceCents, 2690);
 });
 
 test('shipping client can filter services by environment allowlist', async () => {

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { Box, Truck, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -19,45 +20,20 @@ import { formatPrice, getProductById } from '@/services/products';
 import type { Address } from '@/types/user';
 import type { Order, OrderPayment, OrderShipping } from '@/types/order';
 
-function CardIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <rect x="2" y="6" width="20" height="14" rx="2" />
-      <line x1="2" y1="11" x2="22" y2="11" />
-    </svg>
-  );
+function ShippingMethodIcon({ name }: { name: string }) {
+  const normalizedName = name.toLowerCase();
+  if (normalizedName.includes('sedex')) {
+    return <Truck strokeWidth={1.8} aria-hidden="true" />;
+  }
+
+  return <Box strokeWidth={1.8} aria-hidden="true" />;
 }
 
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M4 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14" />
-      <path d="M18 13h4" />
-      <circle cx="17" cy="13" r="1" />
-    </svg>
-  );
-}
-
-function PixIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2 22 12 12 22 2 12 12 2Zm0 4.2L6.2 12 12 17.8 17.8 12 12 6.2Z" />
-    </svg>
-  );
-}
-
-function BoletoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <rect x="2" y="5" width="20" height="14" rx="2" />
-      <line x1="6" y1="9" x2="6" y2="15" strokeWidth="2.5" />
-      <line x1="9" y1="9" x2="9" y2="15" strokeWidth="1.2" />
-      <line x1="11" y1="9" x2="11" y2="15" strokeWidth="2.5" />
-      <line x1="14" y1="9" x2="14" y2="15" strokeWidth="1.2" />
-      <line x1="16" y1="9" x2="16" y2="15" strokeWidth="2.5" />
-      <line x1="18" y1="9" x2="18" y2="15" strokeWidth="1.2" />
-    </svg>
-  );
+function shippingLabel(name: string) {
+  const normalizedName = name.toLowerCase();
+  if (normalizedName.includes('sedex')) return 'SEDEX';
+  if (normalizedName.includes('pac')) return 'PAC';
+  return name;
 }
 
 interface AddressForm {
@@ -318,7 +294,7 @@ export function CheckoutPageClient() {
 
       if (user && saveAddress && selectedAddressId === 'new') {
         try {
-          const updated = upsertAddress({
+          const updated = await upsertAddress({
             ...address,
             isDefault: user.addresses.length === 0
           });
@@ -548,8 +524,9 @@ export function CheckoutPageClient() {
                         hidden
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                        <ShippingMethodIcon name={option.name} />
                         <div style={{ textAlign: 'left' }}>
-                          <b style={{ fontFamily: 'var(--font-head)', fontSize: 13, display: 'block' }}>{option.name}</b>
+                          <b style={{ fontFamily: 'var(--font-head)', fontSize: 13, display: 'block' }}>{shippingLabel(option.name)}</b>
                           <span>{option.deliveryTime ? `${option.deliveryTime} dias uteis` : 'Prazo sob consulta'}</span>
                         </div>
                         <b className="mono" style={{ fontSize: 14 }}>{option.price ? formatPrice(option.price) : 'GRATIS'}</b>
@@ -566,7 +543,7 @@ export function CheckoutPageClient() {
 
               <div className="payments" style={{ gridTemplateColumns: '1fr' }}>
                 <div className="pay-method active" aria-pressed="true">
-                  <WalletIcon />
+                  <Wallet strokeWidth={1.8} aria-hidden="true" />
                   <span>Mercado Pago</span>
                 </div>
               </div>

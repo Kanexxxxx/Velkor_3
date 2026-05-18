@@ -32,6 +32,46 @@ test('mercado pago client returns dev preference without access token', async ()
   assert.match(preference.initPoint, /dev_ord_1/);
 });
 
+test('mercado pago client uses real sandbox preference when dev mode has access token', async () => {
+  const { createMercadoPagoClient } = require('../src/services/mercado-pago');
+  const originalFetch = global.fetch;
+  let requestBody = null;
+  global.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.mercadopago.com/checkout/preferences');
+    assert.equal(options.headers.Authorization, 'Bearer TEST-123');
+    requestBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      json: async () => ({
+        id: 'pref_real_test',
+        init_point: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_real_test',
+        sandbox_init_point: 'https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_real_test',
+      }),
+    };
+  };
+
+  try {
+    const client = createMercadoPagoClient({ MERCADO_PAGO_DEV_MODE: 'true', MERCADO_PAGO_ACCESS_TOKEN: 'TEST-123' });
+    const preference = await client.createPreference({
+      order: {
+        id: 'ord_2',
+        totalCents: 4590,
+        contactName: 'Kaina Rodrigues',
+        email: 'kaina@example.com',
+        items: [{ name: 'Produto VELKOR', quantity: 1, unitPriceCents: 4590 }],
+      },
+    });
+
+    assert.equal(preference.preferenceId, 'pref_real_test');
+    assert.equal(preference.initPoint, 'https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_real_test');
+    assert.equal(preference.sandbox, true);
+    assert.equal(requestBody.external_reference, 'ord_2');
+    assert.equal(requestBody.items[0].unit_price, 45.9);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('payments route rejects webhook when configured secret is invalid', async () => {
   const { createPaymentsHandler } = require('../src/routes/payments');
   const req = require('node:stream').Readable.from([JSON.stringify({ eventId: 'evt_1' })]);
