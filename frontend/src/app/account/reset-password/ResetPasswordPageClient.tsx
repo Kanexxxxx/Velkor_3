@@ -23,14 +23,14 @@ export function ResetPasswordPageClient() {
     const confirmation = String(data.get('confirmation') ?? '');
 
     if (password !== confirmation) {
-      setError('A confirmação não bate com a nova senha.');
+      setError('A confirmacao nao bate com a nova senha.');
       return;
     }
 
     try {
       setPending(true);
       await resetPassword({ token, password });
-      notify('Senha redefinida. Você já está logado.', 'success');
+      notify('Senha redefinida. Voce ja esta logado.', 'success');
       router.push('/account?tab=profile');
     } catch (err) {
       setError((err as Error).message);
@@ -43,7 +43,7 @@ export function ResetPasswordPageClient() {
     <main className="info-page">
       <div className="container">
         <div className="crumbs">
-          <Link href="/">Início</Link>
+          <Link href="/">Inicio</Link>
           <span className="sep">/</span>
           <Link href="/account">Conta</Link>
           <span className="sep">/</span>
@@ -52,23 +52,17 @@ export function ResetPasswordPageClient() {
 
         <div className="info-hero">
           <div>
-            <div className="section-num">RECUPERAÇÃO DE ACESSO</div>
+            <div className="section-num">RECUPERACAO DE ACESSO</div>
             <h1>Nova <span className="red">Senha.</span></h1>
-            <p>Defina uma senha nova para sua conta. Após confirmar, você é levado direto para o painel.</p>
+            <p>Defina uma senha nova para sua conta. Apos confirmar, voce e levado direto para o painel.</p>
           </div>
         </div>
 
         <div className="auth-grid auth-grid-single">
           <form className="form-block" onSubmit={handleSubmit}>
             <h3><span className="num">RESET</span> Crie sua nova senha</h3>
-            <div className="sub">{token ? 'Token válido detectado na URL.' : 'Use o link recebido no email para abrir esta página com token.'}</div>
+            <div className="sub">{token ? 'Link de recuperacao detectado.' : 'Use o link recebido no email para abrir esta pagina.'}</div>
 
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="reset-token">Token</label>
-                <input id="reset-token" name="token" type="text" defaultValue={token} required readOnly={Boolean(token)} />
-              </div>
-            </div>
             <div className="field-row cols-2">
               <div className="field">
                 <label htmlFor="reset-password">Nova senha</label>
@@ -80,13 +74,13 @@ export function ResetPasswordPageClient() {
               </div>
             </div>
 
-            <button type="submit" className="place-order-btn" disabled={pending}>
+            <button type="submit" className="place-order-btn" disabled={pending || !token}>
               {pending ? 'Atualizando...' : 'Salvar nova senha'}
             </button>
 
             {error ? <p className="auth-error" role="alert">{error}</p> : null}
 
-            <Link href="/account" className="auth-secondary">← Voltar para a conta</Link>
+            <Link href="/account" className="auth-secondary">Voltar para a conta</Link>
           </form>
         </div>
       </div>
