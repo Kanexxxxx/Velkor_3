@@ -3,6 +3,7 @@ const {
   emailVerificationTemplate,
   newsletterOptInTemplate,
   orderConfirmationTemplate,
+  orderPaymentApprovedTemplate,
   orderShippedTemplate,
   passwordResetTemplate,
 } = require('./email-templates');
@@ -79,6 +80,9 @@ function createEmailClient(env = process.env) {
     },
     sendOrderConfirmation({ to, order }) {
       return sendEmail({ to, ...orderConfirmationTemplate({ order }), template: 'order-confirmation' });
+    },
+    sendOrderPaymentApproved({ to, order }) {
+      return sendEmail({ to, ...orderPaymentApprovedTemplate({ order }), template: 'order-payment-approved' });
     },
     sendOrderShipped({ to, order }) {
       return sendEmail({ to, ...orderShippedTemplate({ order }), template: 'order-shipped' });

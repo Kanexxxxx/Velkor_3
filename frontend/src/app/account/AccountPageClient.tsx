@@ -10,7 +10,9 @@ import { isStrongPassword, isValidEmail } from '@/services/auth';
 import { requestEmailVerification } from '@/services/authApi';
 import { getInfoHref } from '@/services/infoPages';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
+import { createPaymentPreference } from '@/services/paymentsApi';
 import { formatPrice, getProductById } from '@/services/products';
+import { useProductsById } from '@/services/useProductCatalog';
 import type { Address } from '@/types/user';
 import type { Order } from '@/types/order';
 
@@ -277,6 +279,7 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [verificationPending, setVerificationPending] = useState(false);
 
   useEffect(() => {
@@ -388,6 +391,17 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
                 loading={ordersLoading}
                 error={ordersError}
                 onRetry={() => setOrdersRefreshKey(k => k + 1)}
+                payingOrderId={payingOrderId}
+                onPayOrder={async orderId => {
+                  try {
+                    setPayingOrderId(orderId);
+                    const preference = await createPaymentPreference(orderId);
+                    window.location.href = preference.initPoint;
+                  } catch (error) {
+                    notify(error instanceof Error ? error.message : 'Nao foi possivel reabrir o pagamento.', 'error');
+                    setPayingOrderId(null);
+                  }
+                }}
               />
             ) : null}
             {tab === 'addresses' ? <AddressesPanel /> : null}
@@ -449,12 +463,17 @@ function ProfilePanel() {
   );
 }
 
-function OrdersPanel({ orders, loading, error, onRetry }: {
+function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrder }: {
   orders: Order[];
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  payingOrderId: string | null;
+  onPayOrder: (orderId: string) => Promise<void>;
 }) {
+  const productIds = Array.from(new Set(orders.flatMap(order => order.items.map(item => item.productId))));
+  const { productsById } = useProductsById(productIds);
+
   if (loading) {
     return (
       <article className="account-panel">
@@ -514,6 +533,7 @@ function OrdersPanel({ orders, loading, error, onRetry }: {
           const tax = typeof order.tax === 'number' ? order.tax : 0;
           const discount = typeof order.discount === 'number' ? order.discount : 0;
           const payment = order.payment ?? 'card';
+          const canPayAgain = ['pending', 'cancelled'].includes(order.status) || order.paymentStatus === 'rejected';
           const shipping = order.shipping ?? 'standard';
           const address = order.address;
           return (
@@ -529,10 +549,10 @@ function OrdersPanel({ orders, loading, error, onRetry }: {
               <div className="order-body">
                 <div className="order-products">
                   {order.items.map(item => {
-                    const product = getProductById(item.productId);
+                    const product = productsById[item.productId] ?? getProductById(item.productId);
                     return (
                       <div className="order-product" key={`${item.productId}-${item.size}-${item.color}`}>
-                        <strong>{product?.name ?? item.productId}</strong>
+                        <strong>{product?.name ?? item.name ?? item.productId}</strong>
                         <span>Tamanho {item.size} · QTD {item.quantity}</span>
                       </div>
                     );
@@ -540,12 +560,26 @@ function OrdersPanel({ orders, loading, error, onRetry }: {
                 </div>
                 <dl className="order-grid">
                   <div><dt>Pagamento</dt><dd>{paymentLabel(payment)}</dd></div>
+                  <div><dt>Status do pagamento</dt><dd>{paymentStatusLabel(order.paymentStatus)}</dd></div>
                   <div><dt>Entrega</dt><dd>{shippingMethodLabel(shipping)}</dd></div>
                   <div><dt>Frete</dt><dd>{shippingCost ? formatPrice(shippingCost) : 'Grátis'}</dd></div>
                   <div><dt>Imposto estimado</dt><dd>{formatPrice(tax)}</dd></div>
                   {discount > 0 ? <div><dt>Desconto</dt><dd>-{formatPrice(discount)}</dd></div> : null}
                   {address ? <div><dt>Endereço</dt><dd>{address.street}, {address.city}/{address.region}</dd></div> : null}
                 </dl>
+                <div className="order-actions">
+                  {canPayAgain ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={payingOrderId === order.id}
+                      onClick={() => onPayOrder(order.id)}
+                    >
+                      {payingOrderId === order.id ? 'Abrindo Mercado Pago...' : 'Pagar agora'}
+                    </button>
+                  ) : null}
+                  <button type="button" className="btn btn-ghost" onClick={onRetry}>Atualizar status</button>
+                </div>
               </div>
             </details>
           );
@@ -562,6 +596,16 @@ function paymentLabel(payment: string | undefined) {
     case 'pix': return 'Pix';
     case 'boleto': return 'Boleto';
     default: return payment;
+  }
+}
+
+function paymentStatusLabel(status: Order['paymentStatus']) {
+  switch (status) {
+    case 'approved': return 'Aprovado';
+    case 'rejected': return 'Recusado';
+    case 'refunded': return 'Reembolsado';
+    case 'pending':
+    default: return 'Aguardando pagamento';
   }
 }
 
