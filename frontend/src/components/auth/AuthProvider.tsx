@@ -163,17 +163,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetPassword = useCallback<AuthContextValue['resetPassword']>(async ({ token, password }) => {
     if (!token) throw new Error('Token invalido.');
     if (!isStrongPassword(password)) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
-    const stored = consumeResetToken(token);
-    if (!stored) throw new Error('Token invalido ou expirado.');
 
     try {
-      await authApi.confirmPasswordReset(token, password);
-    } catch (error) {
-      if (!authApi.isAuthApiUnavailable(error)) {
-        // The visible reset flow remains demo-local until email delivery ships.
+      const remote = await authApi.confirmPasswordReset(token, password);
+      if (remote?.user) {
+        setUser(remote.user);
+        return remote.user;
       }
+    } catch (error) {
+      if (!authApi.isAuthApiUnavailable(error)) throw error;
     }
 
+    const stored = consumeResetToken(token);
+    if (!stored) throw new Error('Token invalido ou expirado.');
     const updated = await updateUserPassword(stored.id, password);
     if (!updated) throw new Error('Nao foi possivel atualizar a senha.');
     writeSession(updated.id);

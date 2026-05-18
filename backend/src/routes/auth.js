@@ -347,8 +347,15 @@ function createAuthHandler(repo = authRepo, options = {}) {
           sendJson(res, 400, { error: 'token_invalid' }, corsOrigin);
           return true;
         }
-        const ok = await repo.consumePasswordResetToken(payload.token, payload.newPassword);
-        sendJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: 'token_invalid' }, corsOrigin);
+        const user = await repo.consumePasswordResetToken(payload.token, payload.newPassword);
+        if (!user) {
+          sendJson(res, 400, { error: 'token_invalid' }, corsOrigin);
+          return true;
+        }
+        const session = await repo.createSession({ userId: user.id, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
+        const publicUser = repo.toPublicUser(user);
+        const headers = session ? { 'Set-Cookie': serializeSessionCookie(session.rawToken) } : {};
+        sendJson(res, 200, { ok: true, user: publicUser }, corsOrigin, headers);
         return true;
       }
 

@@ -136,10 +136,11 @@ export async function requestEmailVerification() {
 }
 
 export async function confirmPasswordReset(token: string, newPassword: string) {
-  await request<{ ok: true }>('/password-reset/confirm', {
+  const data = await request<{ ok: true; user?: AuthApiUser }>('/password-reset/confirm', {
     method: 'POST',
     body: JSON.stringify({ token, newPassword }),
   });
+  return data.user ? mapUserResponse({ user: data.user }) : null;
 }
 
 export async function confirmEmailVerification(token: string) {

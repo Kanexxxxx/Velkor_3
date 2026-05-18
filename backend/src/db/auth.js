@@ -217,7 +217,7 @@ async function consumePasswordResetToken(rawToken, newPassword) {
 
   if (!resetToken || resetToken.usedAt || resetToken.expiresAt.getTime() < Date.now()) return false;
 
-  await prisma.$transaction([
+  const [user] = await prisma.$transaction([
     prisma.user.update({
       where: { id: resetToken.userId },
       data: { passwordHash: await hashPassword(newPassword) },
@@ -229,7 +229,7 @@ async function consumePasswordResetToken(rawToken, newPassword) {
     prisma.session.deleteMany({ where: { userId: resetToken.userId } }),
   ]);
 
-  return true;
+  return user;
 }
 
 module.exports = {

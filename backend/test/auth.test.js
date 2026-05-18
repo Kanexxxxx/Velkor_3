@@ -142,6 +142,32 @@ test('auth route sends password reset email when token is created', async () => 
   assert.equal(sentResetUrl, 'https://velkor.test/account/reset-password?token=reset-token');
 });
 
+test('auth route confirms password reset, creates session, and returns user', async () => {
+  const { createAuthHandler } = require('../src/routes/auth');
+  const publicUser = { id: 'usr_reset', email: 'user@example.com', name: 'User', role: 'CUSTOMER', emailVerified: true };
+  let consumed = null;
+  const handler = createAuthHandler({
+    consumePasswordResetToken: async (token, password) => {
+      consumed = { token, password };
+      return { id: publicUser.id, email: publicUser.email, name: publicUser.name, role: publicUser.role, emailVerified: true };
+    },
+    createSession: async ({ userId }) => userId === publicUser.id ? ({ rawToken: 'e'.repeat(64), session: { id: 'ses_reset' } }) : null,
+    toPublicUser: user => user,
+  });
+  const res = makeRes();
+
+  assert.equal(await handler(makeReq({
+    method: 'POST',
+    url: '/api/auth/password-reset/confirm',
+    body: { token: 'reset-token', newPassword: '12345678' },
+  }), res, null), true);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(consumed, { token: 'reset-token', password: '12345678' });
+  assert.match(res.headers['Set-Cookie'], /velkor_sid=e{64};/);
+  assert.deepEqual(JSON.parse(res.body), { ok: true, user: publicUser });
+});
+
 test('auth route requests and confirms email verification', async () => {
   const { createAuthHandler } = require('../src/routes/auth');
   let sentVerificationUrl = '';
