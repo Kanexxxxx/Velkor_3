@@ -144,3 +144,51 @@ test('payments route accepts Mercado Pago signed webhook notifications', async (
   assert.equal(processed[0].status, 'approved');
   assert.equal(processed[0].orderId, 'order_1');
 });
+
+test('payments route sends approved payment email after first approved webhook', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const req = require('node:stream').Readable.from([JSON.stringify({
+    eventId: 'payment:123:approved',
+    externalId: '123',
+    orderId: 'order_paid',
+    status: 'approved',
+  })]);
+  req.method = 'POST';
+  req.url = '/api/payments/webhook';
+  req.headers = { host: 'localhost:3001', 'x-velkor-webhook-secret': 'secret' };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const sent = [];
+  const handler = createPaymentsHandler({
+    appConfig: { MERCADO_PAGO_WEBHOOK_SECRET: 'secret' },
+    repo: {
+      processPaymentWebhook: async payload => {
+        assert.equal(payload.status, 'approved');
+        return { processed: true, duplicate: false, storage: 'database' };
+      },
+      getOrderForNotification: async orderId => ({
+        id: orderId,
+        status: 'paid',
+        email: 'buyer@example.com',
+        totalCents: 1000,
+        items: [],
+      }),
+    },
+    emailService: {
+      sendOrderPaymentApproved: async payload => {
+        sent.push(payload);
+        return { sent: true, mode: 'smtp' };
+      },
+    },
+  });
+
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'buyer@example.com');
+});

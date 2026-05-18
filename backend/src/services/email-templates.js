@@ -2,6 +2,12 @@ function money(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function orderTotal(order) {
+  if (typeof order?.total === 'number') return money(order.total);
+  if (typeof order?.totalCents === 'number') return money(order.totalCents / 100);
+  return money(0);
+}
+
 function baseHtml(title, body) {
   return `
     <div style="margin:0;padding:32px;background:#080808;font-family:Arial,sans-serif;color:#f7f2ea;line-height:1.55">
@@ -32,12 +38,21 @@ function emailVerificationTemplate({ verificationUrl }) {
 }
 
 function orderConfirmationTemplate({ order }) {
-  const total = money(order.total);
+  const total = orderTotal(order);
   const itemCount = Array.isArray(order.items) ? order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) : 0;
   return {
     subject: `VELKOR - pedido ${order.id} confirmado`,
     text: `Parabens pela compra. Recebemos seu pedido ${order.id}. Total: ${total}. Itens: ${itemCount}. Voce recebera novas atualizacoes por email.`,
     html: baseHtml('Pedido confirmado', `<p>Parabens pela compra. Recebemos seu pedido e ele ja esta registrado no sistema.</p><div style="margin:20px 0;padding:18px;border:1px solid #333;border-radius:14px;background:#0b0b0b"><p style="margin:0 0 8px;color:#aaa">Codigo do pedido</p><p style="margin:0;font-size:22px;font-weight:bold">${order.id}</p><p style="margin:16px 0 0;color:#aaa">Total</p><p style="margin:0;font-size:20px;font-weight:bold">${total}</p><p style="margin:16px 0 0;color:#aaa">Itens</p><p style="margin:0">${itemCount}</p></div><p>Quando o status mudar para enviado, voce recebe outro email com a atualizacao.</p>`),
+  };
+}
+
+function orderPaymentApprovedTemplate({ order }) {
+  const total = orderTotal(order);
+  return {
+    subject: `VELKOR - pagamento aprovado do pedido ${order.id}`,
+    text: `Pagamento aprovado para o pedido ${order.id}. Total: ${total}. Agora vamos preparar seu pedido. Se precisar falar com a loja, responda este email com o codigo do pedido.`,
+    html: baseHtml('Pagamento aprovado', `<p>Pagamento aprovado. Agora vamos preparar seu pedido com cuidado e manter voce informado por email.</p><div style="margin:20px 0;padding:18px;border:1px solid #333;border-radius:14px;background:#0b0b0b"><p style="margin:0 0 8px;color:#aaa">Codigo do pedido</p><p style="margin:0;font-size:22px;font-weight:bold">${order.id}</p><p style="margin:16px 0 0;color:#aaa">Total confirmado</p><p style="margin:0;font-size:20px;font-weight:bold">${total}</p></div><p>Se precisar entrar em contato com a loja, responda este email informando o codigo do pedido.</p>`),
   };
 }
 
@@ -61,6 +76,7 @@ module.exports = {
   emailVerificationTemplate,
   newsletterOptInTemplate,
   orderConfirmationTemplate,
+  orderPaymentApprovedTemplate,
   orderShippedTemplate,
   passwordResetTemplate,
 };

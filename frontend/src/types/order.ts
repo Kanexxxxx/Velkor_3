@@ -18,6 +18,10 @@ export interface Order {
   userId?: string;
   items: CartItem[];
   status: OrderStatus;
+  paymentStatus?: 'pending' | 'approved' | 'rejected' | 'refunded';
+  paymentProvider?: string;
+  paymentPreferenceId?: string;
+  paidAt?: string;
   subtotal: number;
   shippingCost: number;
   tax: number;

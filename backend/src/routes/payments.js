@@ -1,6 +1,8 @@
 const paymentRepo = require('../db/payments');
 const { getSessionId } = require('../db/session');
+const { createEmailClient } = require('../services/email');
 const { createMercadoPagoClient } = require('../services/mercado-pago');
+const { sendPaymentApprovedIfNeeded } = require('../services/order-email');
 const { sendJson } = require('./guards');
 const crypto = require('crypto');
 
@@ -73,7 +75,7 @@ function verifyWebhook(req, url, payload, appConfig) {
   });
 }
 
-function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercadoPagoClient(), appConfig = process.env } = {}) {
+function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercadoPagoClient(), appConfig = process.env, emailService = createEmailClient(appConfig) } = {}) {
   return async function handlePaymentsRequest(req, res, corsOrigin) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (!url.pathname.startsWith('/api/payments')) return false;
@@ -130,6 +132,11 @@ function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercado
           status,
           payload,
         });
+        if (result.processed && String(status).toLowerCase() === 'approved' && orderId && typeof repo.getOrderForNotification === 'function') {
+          const order = await repo.getOrderForNotification(orderId);
+          const email = await sendPaymentApprovedIfNeeded({ orderResult: { order, storage: result.storage }, emailService });
+          if (email) result.email = email;
+        }
         sendJson(res, 200, { ok: true, ...result }, corsOrigin);
         return true;
       }

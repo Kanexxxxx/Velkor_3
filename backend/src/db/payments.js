@@ -16,6 +16,15 @@ async function getOrderForPayment(orderId, sessionId) {
   });
 }
 
+async function getOrderForNotification(orderId) {
+  const prisma = getPrisma();
+  if (!prisma || !orderId) return null;
+  return prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true, shippingAddress: true },
+  });
+}
+
 async function createPaymentPreferenceRecord({ orderId, sessionId, preferenceId }) {
   const prisma = getPrisma();
   if (!prisma) return { order: null, storage: 'demo' };
@@ -77,6 +86,7 @@ async function processPaymentWebhook({ eventId, eventType, externalId, orderId, 
 
 module.exports = {
   createPaymentPreferenceRecord,
+  getOrderForNotification,
   getOrderForPayment,
   mapMercadoPagoStatus,
   processPaymentWebhook,

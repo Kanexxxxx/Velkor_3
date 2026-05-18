@@ -17,6 +17,7 @@ import { quoteShipping, type ShippingQuote } from '@/services/shippingApi';
 import { createOrderCode } from '@/services/checkout';
 import { API_BASE_URL } from '@/services/api';
 import { formatPrice, getProductById } from '@/services/products';
+import { useProductsById } from '@/services/useProductCatalog';
 import type { Address } from '@/types/user';
 import type { Order, OrderPayment, OrderShipping } from '@/types/order';
 
@@ -92,6 +93,7 @@ export function CheckoutPageClient() {
   const [addressForm, setAddressForm] = useState<AddressForm>(emptyAddress);
   const [saveAddress, setSaveAddress] = useState(true);
   const [cepLoading, setCepLoading] = useState(false);
+  const { productsById } = useProductsById(items.map(item => item.productId));
 
   useEffect(() => {
     setOrderCode(createOrderCode());
@@ -138,8 +140,10 @@ export function CheckoutPageClient() {
   const total = Math.max(0, subtotal + shippingPrice - discount);
 
   const summaryItems = useMemo(
-    () => items.map(item => ({ item, product: getProductById(item.productId) })).filter(entry => entry.product),
-    [items]
+    () => items
+      .map(item => ({ item, product: productsById[item.productId] ?? getProductById(item.productId) }))
+      .filter(entry => entry.product),
+    [items, productsById]
   );
 
   async function applyCoupon() {
