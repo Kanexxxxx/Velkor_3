@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { Heart, Star, X } from 'lucide-react';
 import { useState } from 'react';
 import { trackEvent } from '@/components/Analytics';
 import { useCart } from '@/components/cart/CartProvider';
@@ -11,30 +12,6 @@ import { categoryLabels, formatPrice } from '@/services/products';
 
 interface ProductCardProps {
   product: Product;
-}
-
-function StarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-      <path d="M18 6L6 18M6 6l12 12" />
-    </svg>
-  );
 }
 
 export function ProductCard({ product }: ProductCardProps) {
@@ -82,7 +59,7 @@ export function ProductCard({ product }: ProductCardProps) {
           aria-pressed={saved}
           onClick={() => toggleWishlist(product.id)}
         >
-          <HeartIcon />
+          <Heart aria-hidden="true" />
         </button>
         <button
           className="quick-add"
@@ -99,7 +76,7 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="size-picker-header">
               <span>Escolha o tamanho</span>
               <button type="button" aria-label="Fechar" onClick={() => setShowSizePicker(false)}>
-                <CloseIcon />
+                <X width={12} height={12} strokeWidth={2.5} aria-hidden="true" />
               </button>
             </div>
             <div className="size-picker-grid">
@@ -128,7 +105,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {formatPrice(product.price)}
           </div>
           <div className="product-rating">
-            <StarIcon />
+            <Star fill="currentColor" aria-hidden="true" />
             <span>{product.rating.toLocaleString('pt-BR')}</span>
           </div>
         </div>

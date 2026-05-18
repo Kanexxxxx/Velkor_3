@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { ShoppingBag, X } from 'lucide-react';
 import { useCart } from '@/components/cart/CartProvider';
 import { formatPrice, getProductById } from '@/services/products';
 
@@ -27,20 +28,14 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             Sua Sacola <span className="mono" style={{ color: 'var(--muted)', fontSize: 13 }}>({summary.itemsCount})</span>
           </h3>
           <button className="close" type="button" aria-label="Fechar sacola" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            <X width={16} height={16} aria-hidden="true" />
           </button>
         </div>
 
         <div className="cart-items">
           {items.length === 0 ? (
             <div className="cart-empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 0 1-8 0" />
-              </svg>
+              <ShoppingBag strokeWidth={1.5} aria-hidden="true" />
               <p>Sua sacola está vazia</p>
             </div>
           ) : (

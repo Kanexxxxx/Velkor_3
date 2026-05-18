@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Camera, MessageCircle } from 'lucide-react';
 import { brand } from '@/services/brand';
 import { getInfoHref } from '@/services/infoPages';
 import { BrandLogo } from './BrandLogo';
@@ -36,25 +37,6 @@ const footerGroups = [
   }
 ];
 
-function InstagramIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="5" y="5" width="14" height="14" rx="4" />
-      <circle cx="12" cy="12" r="3.3" />
-      <path d="M16.4 7.6h.01" />
-    </svg>
-  );
-}
-
-function WhatsAppIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 4.5a7.5 7.5 0 0 0-6.3 11.5L5 19l3.1-.7A7.5 7.5 0 1 0 12 4.5Z" />
-      <path d="M9.3 8.8c.2-.2.4-.2.6 0l.8 1.2c.1.2.1.4 0 .6l-.4.5c.7 1.3 1.6 2.1 2.9 2.7l.5-.4c.2-.1.4-.1.6 0l1.2.8c.2.2.2.4 0 .6-.4.6-1 .9-1.6.8-2.7-.2-5.2-2.7-5.4-5.4 0-.6.3-1.2.8-1.6Z" />
-    </svg>
-  );
-}
-
 export function Footer() {
   return (
     <footer className="footer">
@@ -65,10 +47,10 @@ export function Footer() {
             <p>{brand.tagline}</p>
             <div className="footer-social">
               <a href={brand.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram oficial da VELKOR">
-                <InstagramIcon />
+                <Camera strokeWidth={1.7} aria-hidden="true" />
               </a>
               <a href={brand.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp oficial da VELKOR">
-                <WhatsAppIcon />
+                <MessageCircle strokeWidth={1.7} aria-hidden="true" />
               </a>
             </div>
             <div className="eyebrow" style={{ marginTop: 18 }}>

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { Check, Heart, Package, RefreshCcw, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { trackEvent } from '@/components/Analytics';
 import { useCart } from '@/components/cart/CartProvider';
@@ -25,47 +26,6 @@ const colorNames: Record<string, string> = {
   '#6a6a6a': 'Aço',
   '#2a2a2a': 'Grafite'
 };
-
-function StarIcon({ filled = true }: { filled?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-      <path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-function BoxIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <polyline points="23 4 23 10 17 10" />
-      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
 
 function CatalogStatus({ status, error, onRetry }: { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; onRetry: () => void }) {
   if (status === 'loading') {
@@ -185,7 +145,7 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
             <div className="pdp-meta">
               <div className="pdp-stars" aria-label={`${product.rating.toLocaleString('pt-BR')} de 5 estrelas`}>
                 {Array.from({ length: 5 }, (_, index) => (
-                  <StarIcon filled={index < Math.round(product.rating)} key={index} />
+                  <Star fill={index < Math.round(product.rating) ? 'currentColor' : 'none'} strokeWidth={1.5} key={index} aria-hidden="true" />
                 ))}
               </div>
               <span>{product.rating.toLocaleString('pt-BR')} ({product.reviews.toLocaleString('pt-BR')} avaliações)</span>
@@ -262,14 +222,14 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
                 aria-pressed={saved}
                 onClick={() => toggleWishlist(product.id)}
               >
-                <HeartIcon />
+                <Heart width={18} height={18} strokeWidth={1.8} aria-hidden="true" />
               </button>
             </div>
 
             <ul className="pdp-perks">
-              <li><CheckIcon /> FRETE GRÁTIS ACIMA DE R$ 499</li>
-              <li><BoxIcon /> EMBALAGEM PREMIUM · IDENTIFICAÇÃO DE LOTE INCLUSA</li>
-              <li><RefreshIcon /> TROCA E DEVOLUÇÃO EM ATÉ 30 DIAS</li>
+              <li><Check aria-hidden="true" /> FRETE GRÁTIS ACIMA DE R$ 499</li>
+              <li><Package aria-hidden="true" /> EMBALAGEM PREMIUM · IDENTIFICAÇÃO DE LOTE INCLUSA</li>
+              <li><RefreshCcw aria-hidden="true" /> TROCA E DEVOLUÇÃO EM ATÉ 30 DIAS</li>
             </ul>
           </div>
         </div>

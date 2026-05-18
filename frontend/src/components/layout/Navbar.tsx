@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Heart, Search, ShoppingBag, User } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { CartDrawer } from '@/components/cart/CartDrawer';
@@ -19,42 +20,6 @@ const navItems = [
   { href: '/shop?cat=accessories', label: 'Acessórios' },
   { href: getInfoHref('story'), label: 'Histórias' }
 ];
-
-function SearchIcon() {
-  return (
-    <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function AccountIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4.418 3.582-8 8-8s8 3.582 8 8" />
-    </svg>
-  );
-}
-
-function HeartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
-
-function BagIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
-    </svg>
-  );
-}
 
 function isActive(pathname: string | null, currentSearch: string, href: string) {
   if (!pathname) return false;
@@ -156,7 +121,7 @@ export function Navbar() {
           <div className="nav-actions">
             <form className="search-wrap" role="search" onSubmit={submitSearch}>
               <button className="search-submit" type="submit" aria-label="Pesquisar no acervo">
-                <SearchIcon />
+                <Search className="search-icon" aria-hidden="true" />
               </button>
               <label className="sr-only" htmlFor="siteSearch">Buscar no acervo</label>
               <input
@@ -173,12 +138,12 @@ export function Navbar() {
               <UserMenu />
             ) : (
               <Link className="icon-btn" href="/account" aria-label="Entrar ou criar conta">
-                <AccountIcon />
+                <User aria-hidden="true" />
               </Link>
             )}
 
             <Link className="icon-btn" href="/wishlist" aria-label={`Favoritos (${wishlistIds.length})`}>
-              <HeartIcon />
+              <Heart aria-hidden="true" />
               {wishlistIds.length > 0 ? <span className="cart-count" aria-hidden="true">{wishlistIds.length}</span> : null}
             </Link>
             <button
@@ -189,7 +154,7 @@ export function Navbar() {
               aria-expanded={isCartOpen}
               onClick={() => setIsCartOpen(true)}
             >
-              <BagIcon />
+              <ShoppingBag aria-hidden="true" />
               {summary.itemsCount > 0 ? <span className="cart-count" id="cartCount">{summary.itemsCount}</span> : null}
             </button>
             <button
@@ -226,7 +191,7 @@ export function Navbar() {
         <form className="mobile-search-form" role="search" onSubmit={submitSearch}>
           <label className="sr-only" htmlFor="mobileSearch">Buscar no acervo</label>
           <button className="search-submit" type="submit" aria-label="Pesquisar no acervo">
-            <SearchIcon />
+            <Search className="search-icon" aria-hidden="true" />
           </button>
           <input
             id="mobileSearch"
