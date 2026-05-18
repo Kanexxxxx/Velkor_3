@@ -7,11 +7,17 @@ function mapMercadoPagoStatus(status) {
   return { paymentStatus: 'PENDING', orderStatus: null };
 }
 
-async function getOrderForPayment(orderId, sessionId) {
+async function getOrderForPayment(orderId, sessionId, customerEmail = '') {
   const prisma = getPrisma();
   if (!prisma) return null;
   return prisma.order.findFirst({
-    where: { id: orderId, sessionId },
+    where: {
+      id: orderId,
+      OR: [
+        { sessionId },
+        ...(customerEmail ? [{ email: customerEmail }] : []),
+      ],
+    },
     include: { items: true },
   });
 }
@@ -25,7 +31,7 @@ async function getOrderForNotification(orderId) {
   });
 }
 
-async function createPaymentPreferenceRecord({ orderId, sessionId, preferenceId }) {
+async function createPaymentPreferenceRecord({ orderId, sessionId, preferenceId, customerEmail = '' }) {
   const prisma = getPrisma();
   if (!prisma) return { order: null, storage: 'demo' };
 
@@ -38,7 +44,7 @@ async function createPaymentPreferenceRecord({ orderId, sessionId, preferenceId 
     },
   });
 
-  if (sessionId && order.sessionId !== sessionId) {
+  if (sessionId && order.sessionId !== sessionId && (!customerEmail || order.email !== customerEmail)) {
     const error = new Error('Pedido nao encontrado.');
     error.statusCode = 404;
     throw error;

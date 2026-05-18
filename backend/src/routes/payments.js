@@ -1,5 +1,7 @@
 const paymentRepo = require('../db/payments');
 const { getSessionId } = require('../db/session');
+const authRepoDefault = require('../db/auth');
+const { parseCookies } = require('./auth');
 const { createEmailClient } = require('../services/email');
 const { createMercadoPagoClient } = require('../services/mercado-pago');
 const { sendPaymentApprovedIfNeeded } = require('../services/order-email');
@@ -7,6 +9,7 @@ const { sendJson } = require('./guards');
 const crypto = require('crypto');
 
 class PayloadTooLargeError extends Error {}
+const AUTH_COOKIE_NAME = 'velkor_sid';
 
 function readBody(req, maxBytes = 64 * 1024) {
   return new Promise((resolve, reject) => {
@@ -75,7 +78,14 @@ function verifyWebhook(req, url, payload, appConfig) {
   });
 }
 
-function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercadoPagoClient(), appConfig = process.env, emailService = createEmailClient(appConfig) } = {}) {
+async function getCustomerEmail(req, authRepo) {
+  const rawToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME] || '';
+  if (!rawToken || !authRepo?.findSessionUser) return '';
+  const current = await authRepo.findSessionUser(rawToken);
+  return current?.user?.email || '';
+}
+
+function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercadoPagoClient(), appConfig = process.env, emailService = createEmailClient(appConfig), authRepo = authRepoDefault } = {}) {
   return async function handlePaymentsRequest(req, res, corsOrigin) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (!url.pathname.startsWith('/api/payments')) return false;
@@ -93,13 +103,14 @@ function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercado
           sendJson(res, 400, { error: 'Pedido invalido.' }, corsOrigin);
           return true;
         }
-        const order = await repo.getOrderForPayment(orderId, sessionId);
+        const customerEmail = await getCustomerEmail(req, authRepo);
+        const order = await repo.getOrderForPayment(orderId, sessionId, customerEmail);
         if (!order) {
           sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
           return true;
         }
         const preference = await mercadoPago.createPreference({ order });
-        await repo.createPaymentPreferenceRecord({ orderId, sessionId, preferenceId: preference.preferenceId });
+        await repo.createPaymentPreferenceRecord({ orderId, sessionId, customerEmail, preferenceId: preference.preferenceId });
         sendJson(res, 200, preference, corsOrigin);
         return true;
       }

@@ -192,3 +192,48 @@ test('payments route sends approved payment email after first approved webhook',
   assert.equal(sent.length, 1);
   assert.equal(sent[0].to, 'buyer@example.com');
 });
+
+test('payments route lets authenticated customer reopen payment by order email', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const req = require('node:stream').Readable.from([JSON.stringify({ orderId: 'order_email' })]);
+  req.method = 'POST';
+  req.url = '/api/payments/create-preference';
+  req.headers = {
+    host: 'localhost:3001',
+    'x-velkor-session': 'guest_new',
+    cookie: 'velkor_sid=auth-token',
+  };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const seen = {};
+  const handler = createPaymentsHandler({
+    authRepo: {
+      findSessionUser: async token => {
+        assert.equal(token, 'auth-token');
+        return { user: { email: 'buyer@example.com' } };
+      },
+    },
+    repo: {
+      getOrderForPayment: async (orderId, sessionId, customerEmail) => {
+        Object.assign(seen, { orderId, sessionId, customerEmail });
+        return { id: orderId, sessionId: 'other_guest', email: customerEmail, totalCents: 1000, items: [] };
+      },
+      createPaymentPreferenceRecord: async payload => {
+        assert.equal(payload.customerEmail, 'buyer@example.com');
+        return { order: {}, storage: 'database' };
+      },
+    },
+    mercadoPago: {
+      createPreference: async () => ({ provider: 'mercado_pago', preferenceId: 'pref_email', initPoint: 'https://mp.test', sandbox: false }),
+    },
+  });
+
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(seen, { orderId: 'order_email', sessionId: 'guest_new', customerEmail: 'buyer@example.com' });
+});

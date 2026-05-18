@@ -8,7 +8,8 @@ const { addWishlistItem, deleteWishlistItem, listWishlist } = require('./db/wish
 const { createOrder, getOrder, listOrders, validateCoupon } = require('./db/orders');
 const { quoteCartShipping } = require('./db/shipping');
 const { getSessionId } = require('./db/session');
-const { createAuthHandler } = require('./routes/auth');
+const authRepo = require('./db/auth');
+const { createAuthHandler, parseCookies } = require('./routes/auth');
 const { createAdminHandler } = require('./routes/admin');
 const { createPaymentsHandler } = require('./routes/payments');
 const { sendOrderConfirmationIfNeeded } = require('./services/order-email');
@@ -16,6 +17,7 @@ const { createEmailClient } = require('./services/email');
 const { createShippingClient } = require('./services/shipping');
 
 const PORT = Number(process.env.PORT || 3001);
+const AUTH_COOKIE_NAME = 'velkor_sid';
 const ENV_PATH = path.join(__dirname, '..', '.env');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const NEWSLETTER_FILE = path.join(DATA_DIR, 'newsletter.json');
@@ -164,6 +166,13 @@ function validateSession(req, res, corsOrigin) {
     return null;
   }
   return sessionId;
+}
+
+async function getOptionalCustomerEmail(req) {
+  const rawToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME] || '';
+  if (!rawToken) return '';
+  const current = await authRepo.findSessionUser(rawToken);
+  return current?.user?.email || '';
 }
 
 function validateCartPayload(payload) {
@@ -542,7 +551,7 @@ async function handleRequest(req, res) {
     const sessionId = validateSession(req, res, corsOrigin);
     if (!sessionId) return;
     try {
-      sendJson(res, 200, await listOrders(sessionId), corsOrigin);
+      sendJson(res, 200, await listOrders(sessionId, await getOptionalCustomerEmail(req)), corsOrigin);
     } catch {
       sendJson(res, 500, { error: 'Erro ao carregar pedidos.' }, corsOrigin);
     }
@@ -558,7 +567,7 @@ async function handleRequest(req, res) {
       return;
     }
     try {
-      const result = await getOrder(sessionId, id);
+      const result = await getOrder(sessionId, id, await getOptionalCustomerEmail(req));
       if (!result.order) {
         sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
         return;
