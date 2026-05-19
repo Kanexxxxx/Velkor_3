@@ -59,7 +59,13 @@ test('mercado pago client uses real sandbox preference when dev mode has access 
         totalCents: 4590,
         contactName: 'Kaina Rodrigues',
         email: 'kaina@example.com',
-        items: [{ name: 'Produto VELKOR', quantity: 1, unitPriceCents: 4590 }],
+        contactPhone: '16991557552',
+        shippingAddress: {
+          street: 'Rua Jurua',
+          number: '123',
+          postalCode: '14030410',
+        },
+        items: [{ productId: 'produto-1', name: 'Produto VELKOR', category: 'sneakers', quantity: 1, unitPriceCents: 4590 }],
       },
     });
 
@@ -67,7 +73,16 @@ test('mercado pago client uses real sandbox preference when dev mode has access 
     assert.equal(preference.initPoint, 'https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=pref_real_test');
     assert.equal(preference.sandbox, true);
     assert.equal(requestBody.external_reference, 'ord_2');
+    assert.equal(requestBody.items[0].id, 'produto-1');
+    assert.equal(requestBody.items[0].title, 'Produto VELKOR');
+    assert.equal(requestBody.items[0].description, 'Produto VELKOR');
+    assert.equal(requestBody.items[0].category_id, 'fashion');
     assert.equal(requestBody.items[0].unit_price, 45.9);
+    assert.equal(requestBody.payer.email, 'kaina@example.com');
+    assert.equal(requestBody.payer.first_name, 'Kaina');
+    assert.equal(requestBody.payer.last_name, 'Rodrigues');
+    assert.equal(requestBody.payer.phone.area_code, '16');
+    assert.equal(requestBody.payer.address.zip_code, '14030410');
   } finally {
     global.fetch = originalFetch;
   }
@@ -191,4 +206,49 @@ test('payments route sends approved payment email after first approved webhook',
   assert.equal(res.statusCode, 200);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].to, 'buyer@example.com');
+});
+
+test('payments route lets authenticated customer reopen payment by order email', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const req = require('node:stream').Readable.from([JSON.stringify({ orderId: 'order_email' })]);
+  req.method = 'POST';
+  req.url = '/api/payments/create-preference';
+  req.headers = {
+    host: 'localhost:3001',
+    'x-velkor-session': 'guest_new',
+    cookie: 'velkor_sid=auth-token',
+  };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const seen = {};
+  const handler = createPaymentsHandler({
+    authRepo: {
+      findSessionUser: async token => {
+        assert.equal(token, 'auth-token');
+        return { user: { email: 'buyer@example.com' } };
+      },
+    },
+    repo: {
+      getOrderForPayment: async (orderId, sessionId, customerEmail) => {
+        Object.assign(seen, { orderId, sessionId, customerEmail });
+        return { id: orderId, sessionId: 'other_guest', email: customerEmail, totalCents: 1000, items: [] };
+      },
+      createPaymentPreferenceRecord: async payload => {
+        assert.equal(payload.customerEmail, 'buyer@example.com');
+        return { order: {}, storage: 'database' };
+      },
+    },
+    mercadoPago: {
+      createPreference: async () => ({ provider: 'mercado_pago', preferenceId: 'pref_email', initPoint: 'https://mp.test', sandbox: false }),
+    },
+  });
+
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(seen, { orderId: 'order_email', sessionId: 'guest_new', customerEmail: 'buyer@example.com' });
 });

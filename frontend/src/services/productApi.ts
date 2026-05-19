@@ -17,6 +17,7 @@ export interface CatalogState {
   source: CatalogSource;
 }
 
+const CATALOG_CACHE_KEY = 'velkor_catalog_cache_v1';
 const REQUEST_TIMEOUT_MS = 5000;
 const fallbackCategories: ApiCategory[] = [
   { id: 'cat_sneakers', slug: 'sneakers', name: 'Tenis' },
@@ -81,7 +82,7 @@ function normalizeCategory(value: unknown): ApiCategory | null {
 
 async function fetchJson<T>(path: string): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -91,7 +92,7 @@ async function fetchJson<T>(path: string): Promise<T> {
     if (!response.ok) throw new Error(`API respondeu ${response.status}`);
     return await response.json() as T;
   } finally {
-    window.clearTimeout(timeout);
+    clearTimeout(timeout);
   }
 }
 
@@ -111,6 +112,34 @@ export async function fetchCatalog(): Promise<CatalogState> {
     categories: apiCategories.length ? apiCategories : fallbackCategories,
     source: 'api'
   };
+}
+
+export function readCachedCatalog(): CatalogState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { products?: unknown[]; categories?: unknown[]; source?: string };
+    const cachedProducts = safeArray(parsed.products).map(normalizeProduct).filter((product): product is Product => Boolean(product));
+    const cachedCategories = safeArray(parsed.categories).map(normalizeCategory).filter((category): category is ApiCategory => Boolean(category));
+    if (!cachedProducts.length) return null;
+    return {
+      products: cachedProducts,
+      categories: cachedCategories.length ? cachedCategories : fallbackCategories,
+      source: 'api',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedCatalog(catalog: CatalogState) {
+  if (typeof window === 'undefined' || catalog.source !== 'api') return;
+  try {
+    window.localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(catalog));
+  } catch {
+    // Cache is best-effort only.
+  }
 }
 
 export async function fetchProduct(slug: string): Promise<Product> {

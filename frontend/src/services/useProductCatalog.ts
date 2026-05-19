@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Product } from '@/types/product';
-import { fallbackCatalog, fetchCatalog, fetchProduct, type CatalogState } from '@/services/productApi';
+import { fallbackCatalog, fetchCatalog, fetchProduct, readCachedCatalog, writeCachedCatalog, type CatalogState } from '@/services/productApi';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -12,9 +12,17 @@ export interface CatalogLoadState extends CatalogState {
   retry: () => void;
 }
 
+function getInitialCatalogState() {
+  const cached = readCachedCatalog();
+  return {
+    catalog: cached ?? { products: [], categories: fallbackCatalog.categories, source: 'api' as const },
+    status: cached ? 'ready' as LoadStatus : 'idle' as LoadStatus,
+  };
+}
+
 export function useProductCatalog(): CatalogLoadState {
-  const [catalog, setCatalog] = useState<CatalogState>(fallbackCatalog);
-  const [status, setStatus] = useState<LoadStatus>('idle');
+  const [catalog, setCatalog] = useState<CatalogState>(() => getInitialCatalogState().catalog);
+  const [status, setStatus] = useState<LoadStatus>(() => getInitialCatalogState().status);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
 
@@ -30,6 +38,7 @@ export function useProductCatalog(): CatalogLoadState {
     fetchCatalog()
       .then(nextCatalog => {
         if (!active) return;
+        writeCachedCatalog(nextCatalog);
         setCatalog(nextCatalog);
         setStatus('ready');
       })

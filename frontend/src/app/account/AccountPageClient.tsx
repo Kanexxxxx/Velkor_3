@@ -6,8 +6,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
+import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
-import { requestEmailVerification } from '@/services/authApi';
 import { getInfoHref } from '@/services/infoPages';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
 import { createPaymentPreference } from '@/services/paymentsApi';
@@ -39,12 +39,12 @@ function formatDate(value: string) {
   }
 }
 
-export function AccountPageClient() {
+export function AccountPageClient({ initialTab = 'profile' }: { initialTab?: TabKey } = {}) {
   const { user, isAuthenticated, isReady, login, register, requestPasswordReset, logout } = useAuth();
   const { notify } = useNotifications();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabParam = (searchParams.get('tab') ?? 'profile') as TabKey;
+  const tabParam = (searchParams.get('tab') ?? initialTab) as TabKey;
   const tab = TABS.some(item => item.key === tabParam) ? tabParam : 'profile';
 
   if (!isReady) {
@@ -287,9 +287,16 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
     let active = true;
     setOrdersLoading(true);
     setOrdersError(null);
-    loadOrdersForUser(user.id)
-      .then(nextOrders => { if (active) setOrders(nextOrders); })
-      .catch(() => { if (active) setOrdersError('Não foi possível carregar os pedidos.'); })
+    listAccountOrders()
+      .then(({ orders: nextOrders }) => { if (active) setOrders(nextOrders); })
+      .catch(async error => {
+        if (!active) return;
+        if (isAccountApiUnavailable(error)) {
+          setOrders(await loadOrdersForUser(user.id));
+        } else {
+          setOrdersError('Não foi possível carregar os pedidos.');
+        }
+      })
       .finally(() => { if (active) setOrdersLoading(false); });
     return () => { active = false; };
   }, [user, tab, ordersRefreshKey]);
@@ -417,6 +424,7 @@ function ProfilePanel() {
   const { user, updateProfile } = useAuth();
   const { notify } = useNotifications();
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (user) setForm({ name: user.name, email: user.email, phone: user.phone ?? '' });
@@ -427,10 +435,13 @@ function ProfilePanel() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      updateProfile(form);
+      setPending(true);
+      await updateProfile(form);
       notify('Perfil atualizado com sucesso.', 'success');
     } catch (error) {
       notify((error as Error).message, 'error');
+    } finally {
+      setPending(false);
     }
   }
 
@@ -457,7 +468,7 @@ function ProfilePanel() {
             <input id="profile-phone" type="tel" value={form.phone} onChange={event => setForm(state => ({ ...state, phone: event.target.value }))} placeholder="+55 11 99999-9999" />
           </div>
         </div>
-        <button type="submit" className="place-order-btn">Salvar alterações</button>
+        <button type="submit" className="place-order-btn" disabled={pending}>{pending ? 'Salvando...' : 'Salvar alterações'}</button>
       </form>
     </article>
   );

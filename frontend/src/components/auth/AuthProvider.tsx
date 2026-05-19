@@ -24,6 +24,7 @@ import {
   writeSession
 } from '@/services/auth';
 import * as authApi from '@/services/authApi';
+import * as accountApi from '@/services/accountApi';
 import type { Address, User } from '@/types/user';
 
 interface AuthContextValue {
@@ -35,7 +36,7 @@ interface AuthContextValue {
   logout: () => void;
   requestPasswordReset: (email: string) => Promise<{ token: string; expiresAt: string; delivered: boolean }>;
   resetPassword: (input: { token: string; password: string }) => Promise<User>;
-  updateProfile: (patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => User;
+  updateProfile: (patch: Partial<Pick<User, 'name' | 'email' | 'phone'>>) => Promise<User>;
   changePassword: (input: { currentPassword: string; nextPassword: string }) => Promise<void>;
   upsertAddress: (input: Omit<Address, 'id'> & { id?: string }) => Promise<User>;
   removeAddress: (addressId: string) => Promise<User>;
@@ -61,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function loadApiFirst() {
       try {
-        const remote = await authApi.getMe();
+        const remote = await accountApi.getMe();
         if (cancelled) return;
         setUser(remote?.user ?? loadCurrentUser());
       } catch (error) {
@@ -184,14 +185,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return publicData;
   }, []);
 
-  const updateProfile = useCallback<AuthContextValue['updateProfile']>(patch => {
+  const updateProfile = useCallback<AuthContextValue['updateProfile']>(async patch => {
     if (!user) throw new Error('Voce precisa estar logado.');
     if (patch.email && !isValidEmail(patch.email)) throw new Error('Email invalido.');
 
-    if (patch.name) {
-      authApi.updateProfile(patch.name)
-        .then(remote => setUser(current => current ? { ...current, name: remote.user.name } : remote.user))
-        .catch(() => undefined);
+    try {
+      const remote = await accountApi.updateProfile(patch.name ?? user.name);
+      const nextUser = { ...remote.user, email: user.email, addresses: user.addresses };
+      setUser(nextUser);
+      return nextUser;
+    } catch (error) {
+      if (!accountApi.isAccountApiUnavailable(error)) throw error;
     }
 
     const updated = updateUserProfile(user.id, patch);
@@ -209,10 +213,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isStrongPassword(nextPassword)) throw new Error('A nova senha precisa ter pelo menos 6 caracteres.');
 
     try {
-      await authApi.changePassword(currentPassword, nextPassword);
+      await accountApi.changePassword(currentPassword, nextPassword);
       return;
     } catch (error) {
-      if (!authApi.isAuthApiUnavailable(error)) throw error;
+      if (!accountApi.isAccountApiUnavailable(error)) throw error;
     }
 
     const stored = readUsers().find(item => item.id === user.id);
@@ -227,12 +231,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const upsertAddressFor = useCallback<AuthContextValue['upsertAddress']>(async input => {
     if (!user) throw new Error('Voce precisa estar logado.');
     try {
-      const remote = await authApi.upsertAddress(input);
+      const remote = await accountApi.upsertAddress(input);
       const nextUser = { ...user, addresses: remote.addresses };
       setUser(nextUser);
       return nextUser;
     } catch (error) {
-      if (!authApi.isAuthApiUnavailable(error)) throw error;
+      if (!accountApi.isAccountApiUnavailable(error)) throw error;
     }
 
     const updated = upsertAddress(user.id, input);
@@ -245,12 +249,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const removeAddress = useCallback<AuthContextValue['removeAddress']>(async addressId => {
     if (!user) throw new Error('Voce precisa estar logado.');
     try {
-      const remote = await authApi.deleteAddress(addressId);
+      const remote = await accountApi.deleteAddress(addressId);
       const nextUser = { ...user, addresses: remote.addresses };
       setUser(nextUser);
       return nextUser;
     } catch (error) {
-      if (!authApi.isAuthApiUnavailable(error)) throw error;
+      if (!accountApi.isAccountApiUnavailable(error)) throw error;
     }
 
     const updated = deleteAddress(user.id, addressId);
@@ -263,12 +267,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const makeAddressDefault = useCallback<AuthContextValue['makeAddressDefault']>(async addressId => {
     if (!user) throw new Error('Voce precisa estar logado.');
     try {
-      const remote = await authApi.setDefaultAddress(addressId);
+      const remote = await accountApi.setDefaultAddress(addressId);
       const nextUser = { ...user, addresses: remote.addresses };
       setUser(nextUser);
       return nextUser;
     } catch (error) {
-      if (!authApi.isAuthApiUnavailable(error)) throw error;
+      if (!accountApi.isAccountApiUnavailable(error)) throw error;
     }
 
     const updated = setDefaultAddress(user.id, addressId);

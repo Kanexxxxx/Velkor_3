@@ -246,12 +246,17 @@ async function createOrder(sessionId, rawInput, options = {}) {
   return { order: toApiOrder(order), storage: 'database' };
 }
 
-async function listOrders(sessionId) {
+async function listOrders(sessionId, customerEmail = '') {
   const prisma = getPrisma();
   if (!prisma) return { orders: [], storage: 'demo' };
 
   const orders = await prisma.order.findMany({
-    where: { sessionId },
+    where: {
+      OR: [
+        { sessionId },
+        ...(customerEmail ? [{ email: customerEmail }] : []),
+      ],
+    },
     include: { items: true, shippingAddress: true },
     orderBy: { createdAt: 'desc' },
   });
@@ -259,12 +264,18 @@ async function listOrders(sessionId) {
   return { orders: orders.map(toApiOrder), storage: 'database' };
 }
 
-async function getOrder(sessionId, id) {
+async function getOrder(sessionId, id, customerEmail = '') {
   const prisma = getPrisma();
   if (!prisma) return { order: null, storage: 'demo' };
 
   const order = await prisma.order.findFirst({
-    where: { id, sessionId },
+    where: {
+      id,
+      OR: [
+        { sessionId },
+        ...(customerEmail ? [{ email: customerEmail }] : []),
+      ],
+    },
     include: { items: true, shippingAddress: true },
   });
 

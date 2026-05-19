@@ -6,6 +6,7 @@ import { Analytics } from '@/components/Analytics';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { CartProvider } from '@/components/cart/CartProvider';
 import { CookieConsent } from '@/components/CookieConsent';
+import { GlobalLoadingBar } from '@/components/GlobalLoadingBar';
 import { Footer } from '@/components/layout/Footer';
 import { Navbar } from '@/components/layout/Navbar';
 import { NotificationProvider } from '@/components/notifications/NotificationProvider';
@@ -62,6 +63,9 @@ export default function RootLayout({
                 </Suspense>
                 <main>{children}</main>
                 <Footer />
+                <Suspense fallback={null}>
+                  <GlobalLoadingBar />
+                </Suspense>
                 <CookieConsent />
               </WishlistProvider>
             </CartProvider>
