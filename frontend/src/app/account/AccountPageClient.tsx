@@ -6,8 +6,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
+import { requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
-import { requestEmailVerification } from '@/services/authApi';
 import { getInfoHref } from '@/services/infoPages';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
 import { createPaymentPreference } from '@/services/paymentsApi';
@@ -417,6 +417,7 @@ function ProfilePanel() {
   const { user, updateProfile } = useAuth();
   const { notify } = useNotifications();
   const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (user) setForm({ name: user.name, email: user.email, phone: user.phone ?? '' });
@@ -427,10 +428,13 @@ function ProfilePanel() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      updateProfile(form);
+      setPending(true);
+      await updateProfile(form);
       notify('Perfil atualizado com sucesso.', 'success');
     } catch (error) {
       notify((error as Error).message, 'error');
+    } finally {
+      setPending(false);
     }
   }
 
@@ -457,7 +461,7 @@ function ProfilePanel() {
             <input id="profile-phone" type="tel" value={form.phone} onChange={event => setForm(state => ({ ...state, phone: event.target.value }))} placeholder="+55 11 99999-9999" />
           </div>
         </div>
-        <button type="submit" className="place-order-btn">Salvar alterações</button>
+        <button type="submit" className="place-order-btn" disabled={pending}>{pending ? 'Salvando...' : 'Salvar alterações'}</button>
       </form>
     </article>
   );
