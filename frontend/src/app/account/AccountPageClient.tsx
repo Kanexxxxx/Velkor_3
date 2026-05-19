@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
-import { SectionCard, StatusBadge } from '@/components/operational';
+import { EmptyState, SectionCard, StatusBadge } from '@/components/operational';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
@@ -515,8 +515,31 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
   payingOrderId: string | null;
   onPayOrder: (orderId: string) => Promise<void>;
 }) {
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
   const productIds = Array.from(new Set(orders.flatMap(order => order.items.map(item => item.productId))));
   const { productsById } = useProductsById(productIds);
+  const pageSize = 6;
+  const filteredOrders = orders.filter(order => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const matchesQuery = !normalizedQuery || [
+      order.id,
+      order.paymentPreferenceId,
+      order.contact?.email,
+      order.items.map(item => item.name || item.productId).join(' '),
+    ]
+      .some(value => String(value || '').toLowerCase().includes(normalizedQuery));
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter || order.paymentStatus === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const visibleOrders = filteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, orders.length]);
 
   if (loading) {
     return (
@@ -570,8 +593,38 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
         <h2>Meus pedidos</h2>
         <p>Histórico completo, status atual e detalhes de cada compra.</p>
       </header>
+      <div className="account-list-tools">
+        <label>
+          <span>Buscar pedido</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Codigo ou ID do pedido"
+            onChange={event => setQuery(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Status</span>
+          <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+            <option value="all">Todos</option>
+            <option value="pending">Pendente</option>
+            <option value="paid">Pago</option>
+            <option value="approved">Pagamento aprovado</option>
+            <option value="shipped">Enviado</option>
+            <option value="fulfilled">Concluido</option>
+            <option value="cancelled">Cancelado</option>
+            <option value="rejected">Pagamento recusado</option>
+          </select>
+        </label>
+      </div>
+      {!visibleOrders.length ? (
+        <EmptyState
+          title="Nenhum pedido encontrado"
+          description="Ajuste a busca ou o filtro para ver outros pedidos da sua conta."
+        />
+      ) : null}
       <div className="orders-list">
-        {orders.map(order => {
+        {visibleOrders.map(order => {
           const status = orderStatusLabels[order.status] ?? orderStatusLabels.pending;
           const shippingCost = typeof order.shippingCost === 'number' ? order.shippingCost : 0;
           const tax = typeof order.tax === 'number' ? order.tax : 0;
@@ -632,6 +685,17 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           );
         })}
       </div>
+      {filteredOrders.length > pageSize ? (
+        <div className="account-pagination">
+          <button type="button" className="btn btn-ghost" disabled={safePage <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>
+            Anterior
+          </button>
+          <span>Pagina {safePage} de {pageCount}</span>
+          <button type="button" className="btn btn-ghost" disabled={safePage >= pageCount} onClick={() => setPage(value => Math.min(pageCount, value + 1))}>
+            Proxima
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
