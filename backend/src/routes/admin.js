@@ -122,6 +122,11 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname === '/api/admin/logs' && req.method === 'GET') {
+        sendJson(res, 200, await repo.listAdminAuditLogs(), corsOrigin);
+        return true;
+      }
+
       if (url.pathname === '/api/admin/products' && req.method === 'GET') {
         sendJson(res, 200, await repo.listAdminProducts(), corsOrigin);
         return true;

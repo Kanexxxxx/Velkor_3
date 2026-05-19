@@ -179,6 +179,35 @@ test('admin route updates order status for admins', async () => {
   assert.deepEqual(statusInput, { id: 'order_1', status: 'paid', adminUserId: 'adm_2' });
 });
 
+test('admin route lists audit logs for admins', async () => {
+  const { createAdminHandler } = require('../src/routes/admin');
+  const res = makeRes();
+  const handler = createAdminHandler({
+    authRepo: { findSessionUser: async () => ({ user: { id: 'adm_logs', role: 'ADMIN' } }) },
+    appConfig: {},
+    repo: {
+      listAdminAuditLogs: async () => ({
+        logs: [{
+          id: 'log_1',
+          action: 'product.update',
+          adminUserId: 'adm_logs',
+          adminEmail: 'admin@example.com',
+          targetType: 'product',
+          targetId: 'prod_1',
+          timestamp: '2026-05-19T10:00:00.000Z',
+        }],
+        storage: 'database',
+      }),
+    },
+  });
+
+  assert.equal(await handler(makeReq({ method: 'GET', url: '/api/admin/logs' }), res, null), true);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).logs[0].action, 'product.update');
+  assert.equal(JSON.parse(res.body).logs[0].targetId, 'prod_1');
+});
+
 test('admin route creates and updates products for admins', async () => {
   const { createAdminHandler } = require('../src/routes/admin');
   const createRes = makeRes();

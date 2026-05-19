@@ -78,6 +78,17 @@ export interface AdminSettings {
   };
 }
 
+export interface AdminAuditLog {
+  id: string;
+  action: string;
+  adminUserId: string | null;
+  adminEmail: string | null;
+  targetType: string;
+  targetId: string | null;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface AdminProduct {
   id: string;
   slug: string;
@@ -180,6 +191,11 @@ export async function fetchAdminProducts() {
 export async function fetchAdminSettings() {
   const data = await request<{ settings: AdminSettings }>('/api/admin/settings');
   return data.settings;
+}
+
+export async function fetchAdminAuditLogs() {
+  const data = await request<{ logs: AdminAuditLog[]; storage?: string }>('/api/admin/logs');
+  return data.logs ?? [];
 }
 
 export async function createAdminProduct(payload: Partial<AdminProduct>) {

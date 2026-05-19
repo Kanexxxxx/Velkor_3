@@ -13,6 +13,7 @@ import {
   fetchAdminOrders,
   fetchAdminProducts,
   fetchAdminSettings,
+  fetchAdminAuditLogs,
   fetchNewsletterSubscribers,
   getAdminMe,
   isAdminApiUnavailable,
@@ -27,6 +28,7 @@ import {
   type AdminCoupon,
   type AdminRole,
   type AdminSettings,
+  type AdminAuditLog,
   type AdminUser,
   type AdminProductImportPreview,
   type NewsletterSubscriber,
@@ -203,6 +205,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [adminCoupons, setAdminCoupons] = useState<AdminCoupon[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
+  const [adminAuditLogs, setAdminAuditLogs] = useState<AdminAuditLog[]>([]);
   const [userForms, setUserForms] = useState<UserFormState>({});
   const [couponForm, setCouponForm] = useState<CouponFormState>(emptyCouponForm);
   const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm);
@@ -238,13 +241,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   }
 
   async function loadRealAdminData() {
-    const [remoteOrders, remoteProducts, remoteUsers, remoteCoupons, remoteNewsletter, remoteSettings] = await Promise.all([
+    const [remoteOrders, remoteProducts, remoteUsers, remoteCoupons, remoteNewsletter, remoteSettings, remoteAuditLogs] = await Promise.all([
       fetchAdminOrders(),
       fetchAdminProducts(),
       fetchAdminUsers(),
       fetchAdminCoupons(),
       fetchNewsletterSubscribers(),
       fetchAdminSettings(),
+      fetchAdminAuditLogs(),
     ]);
     setOrders(remoteOrders);
     setAdminProducts(remoteProducts);
@@ -252,6 +256,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     setAdminCoupons(remoteCoupons);
     setNewsletterSubscribers(remoteNewsletter);
     setAdminSettings(remoteSettings);
+    setAdminAuditLogs(remoteAuditLogs);
     setApiMode('real');
     setUnlocked(true);
   }
@@ -318,6 +323,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setAdminCoupons([]);
       setNewsletterSubscribers([]);
       setAdminSettings(null);
+      setAdminAuditLogs([]);
       setApiMode('demo');
       setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
@@ -1127,20 +1133,32 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
 
             <section className="info-block" hidden={activeSection !== 'logs'}>
               <h2>Logs e auditoria</h2>
-              <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                  <h5>Auditoria ativa</h5>
-                  <div className="meta">Alteracoes criticas de pedido, produto, cupom e usuario passam pelo backend admin protegido.</div>
+              {adminAuditLogs.length ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  {adminAuditLogs.slice(0, 20).map(log => (
+                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={log.id}>
+                      <div>
+                        <h5>{log.action}</h5>
+                        <div className="meta">
+                          {log.targetType || 'registro'} {log.targetId ? `- ${log.targetId}` : ''} - {log.adminEmail || log.adminUserId || 'admin'} - {new Date(log.timestamp).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                      <span className="order-status status-delivered">AUDIT</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                  <h5>Seguranca</h5>
-                  <div className="meta">RequireAdmin, rate limit administrativo e sessoes HttpOnly permanecem ativos.</div>
+              ) : (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Nenhum log carregado</h5>
+                    <div className="meta">Quando voce alterar pedido, produto, cupom, usuario ou newsletter, o registro aparece aqui.</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Seguranca</h5>
+                    <div className="meta">RequireAdmin, rate limit administrativo e sessoes HttpOnly permanecem ativos.</div>
+                  </div>
                 </div>
-                <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                  <h5>Proximo incremento</h5>
-                  <div className="meta">Listagem paginada dos AdminAuditLog direto do PostgreSQL.</div>
-                </div>
-              </div>
+              )}
             </section>
 
             <section className="info-block" hidden={activeSection !== 'coupons'}>
