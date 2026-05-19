@@ -3227,6 +3227,47 @@ section { position: relative; }
   letter-spacing: 0.04em;
 }
 
+.account-overview-card {
+  margin-bottom: 24px;
+}
+.account-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.account-overview-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 128px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink);
+  padding: 16px;
+}
+.account-overview-grid span {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.account-overview-grid strong {
+  display: block;
+  font-family: var(--font-head);
+  font-size: clamp(1.25rem, 1.9vw, 1.8rem);
+  line-height: 1;
+}
+.account-overview-grid a {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
 /* Wishlist actions */
 .wishlist-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -3573,6 +3614,7 @@ code {
 @media (max-width: 760px) {
   .auth-grid { grid-template-columns: 1fr; }
   .account-stats { grid-template-columns: 1fr 1fr; }
+  .account-overview-grid { grid-template-columns: 1fr 1fr; }
   .order-card summary {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -3599,6 +3641,7 @@ code {
 @media (max-width: 520px) {
   .toast-stack { left: 16px; right: 16px; bottom: 16px; max-width: none; }
   .account-stats { grid-template-columns: 1fr; }
+  .account-overview-grid { grid-template-columns: 1fr; }
   .account-avatar { width: 60px; height: 60px; font-size: 22px; }
   .addresses-list { grid-template-columns: 1fr; }
   .account-nav a { flex: 1 1 100%; }

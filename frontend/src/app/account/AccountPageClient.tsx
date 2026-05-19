@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
+import { SectionCard, StatusBadge } from '@/components/operational';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
@@ -371,6 +372,37 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
             <span className="stat-label">Total comprado</span>
           </div>
         </section>
+
+        <SectionCard
+          title="Resumo operacional"
+          description="Seus pedidos, seguranca da conta e atalhos principais em um so lugar."
+          className="account-overview-card"
+        >
+          <div className="account-overview-grid">
+            <div>
+              <span>Status do email</span>
+              <strong>{user.emailVerified === false ? 'Pendente' : 'Verificado'}</strong>
+              <StatusBadge tone={user.emailVerified === false ? 'warning' : 'success'}>
+                {user.emailVerified === false ? 'Verificar' : 'Seguro'}
+              </StatusBadge>
+            </div>
+            <div>
+              <span>Pedidos</span>
+              <strong>{ordersLoading ? '...' : orders.length}</strong>
+              <Link href="/account/orders" scroll={false}>Ver historico</Link>
+            </div>
+            <div>
+              <span>Favoritos</span>
+              <strong>{productIds.length}</strong>
+              <Link href="/wishlist">Ver lista</Link>
+            </div>
+            <div>
+              <span>Total comprado</span>
+              <strong>{formatPrice(totalSpent)}</strong>
+              <Link href="/shop">Continuar comprando</Link>
+            </div>
+          </div>
+        </SectionCard>
 
         <section className="account-shell">
           <nav className="account-nav" aria-label="Seções da conta">
