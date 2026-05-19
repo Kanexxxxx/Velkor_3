@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
-import { getOrder, isAccountApiUnavailable } from '@/services/accountApi';
+import { getOrder, isAccountApiUnavailable, resendOrderConfirmation } from '@/services/accountApi';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
 import { createPaymentPreference } from '@/services/paymentsApi';
 import { formatPrice, getProductById } from '@/services/products';
@@ -55,6 +55,7 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [paying, setPaying] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
 
   const productIds = useMemo(() => Array.from(new Set(order?.items.map(item => item.productId) ?? [])), [order]);
   const { productsById } = useProductsById(productIds);
@@ -158,6 +159,19 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
     }
   }
 
+  async function handleResendConfirmation() {
+    if (!order) return;
+    try {
+      setResendingEmail(true);
+      await resendOrderConfirmation(order.id);
+      notify('Confirmacao do pedido reenviada para seu email.', 'success');
+    } catch (caught) {
+      notify(caught instanceof Error ? caught.message : 'Nao foi possivel reenviar a confirmacao.', 'error');
+    } finally {
+      setResendingEmail(false);
+    }
+  }
+
   return (
     <main className="info-page account-dashboard">
       <div className="container">
@@ -206,6 +220,9 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
               </div>
               <div className="order-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setRefreshKey(key => key + 1)}>Atualizar</button>
+                <button type="button" className="btn btn-ghost" disabled={resendingEmail} onClick={handleResendConfirmation}>
+                  {resendingEmail ? 'Reenviando...' : 'Reenviar confirmacao'}
+                </button>
                 {canPayAgain ? (
                   <button type="button" className="btn btn-primary" disabled={paying} onClick={handlePayAgain}>
                     {paying ? 'Abrindo Mercado Pago...' : 'Pagar agora'}

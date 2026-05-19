@@ -69,6 +69,12 @@ export async function getOrder(id: string) {
   return request<{ order: Order; storage?: string }>(`/orders/${encodeURIComponent(id)}`);
 }
 
+export async function resendOrderConfirmation(id: string) {
+  return request<{ ok: true; email?: { sent?: boolean; mode?: string } }>(`/orders/${encodeURIComponent(id)}/resend-confirmation`, {
+    method: 'POST',
+  });
+}
+
 export async function upsertAddress(address: Omit<Address, 'id'> & { id?: string }) {
   const path = address.id ? `/addresses/${encodeURIComponent(address.id)}` : '/addresses';
   return request<{ address: Address; addresses: Address[] }>(path, {

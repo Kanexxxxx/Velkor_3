@@ -4,6 +4,7 @@ const { getSessionId } = require('../db/session');
 const { requireAuth, sendJson } = require('./guards');
 const { parseCookies } = require('./auth');
 const { createEmailClient } = require('../services/email');
+const { sendOrderConfirmationIfNeeded } = require('../services/order-email');
 
 const MAX_BODY_BYTES = 32 * 1024;
 const COOKIE_NAME = 'velkor_sid';
@@ -134,6 +135,23 @@ function createAccountHandler({ authRepo = authRepoDefault, orderRepo = orderRep
       if (url.pathname === '/api/account/orders' && req.method === 'GET') {
         const sessionId = getSessionId(req) || '';
         sendJson(res, 200, await orderRepo.listOrders(sessionId, current.user.email), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/account/orders/') && url.pathname.endsWith('/resend-confirmation') && req.method === 'POST') {
+        const id = extractId(url.pathname, '/api/account/orders/', '/resend-confirmation');
+        if (!id) {
+          sendJson(res, 400, { error: 'Pedido invalido.' }, corsOrigin);
+          return true;
+        }
+        const sessionId = getSessionId(req) || '';
+        const result = await orderRepo.getOrder(sessionId, id, current.user.email);
+        if (!result.order) {
+          sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        const email = await sendOrderConfirmationIfNeeded({ orderResult: result, emailService: accountEmailService });
+        sendJson(res, 200, { ok: true, email: email || { sent: false } }, corsOrigin);
         return true;
       }
 
