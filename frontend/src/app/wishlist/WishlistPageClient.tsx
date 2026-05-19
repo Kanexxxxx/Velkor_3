@@ -7,16 +7,20 @@ import { useNotifications } from '@/components/notifications/NotificationProvide
 import { ProductCard } from '@/components/product/ProductCard';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { formatPrice, getProductById } from '@/services/products';
+import { useProductsById } from '@/services/useProductCatalog';
 import type { Product } from '@/types/product';
 
 export function WishlistPageClient() {
   const { productIds } = useWishlist();
   const { addItem } = useCart();
   const { notify } = useNotifications();
+  const { productsById, status } = useProductsById(productIds);
 
   const wishlistProducts = useMemo<Product[]>(
-    () => productIds.map(id => getProductById(id)).filter((product): product is Product => Boolean(product)),
-    [productIds]
+    () => productIds
+      .map(id => productsById[id] ?? getProductById(id))
+      .filter((product): product is Product => Boolean(product)),
+    [productIds, productsById]
   );
 
   const totalValue = wishlistProducts.reduce((sum, product) => sum + product.price, 0);
@@ -62,6 +66,11 @@ export function WishlistPageClient() {
         {wishlistProducts.length ? (
           <div className="product-grid shop-grid">
             {wishlistProducts.map(product => <ProductCard product={product} key={product.id} />)}
+          </div>
+        ) : status === 'loading' ? (
+          <div className="empty-state">
+            <h2>Carregando favoritos.</h2>
+            <p>Estamos buscando os produtos salvos no catalogo atual.</p>
           </div>
         ) : (
           <div className="empty-state">

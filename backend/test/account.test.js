@@ -63,6 +63,71 @@ test('account route lists orders scoped to authenticated email', async () => {
   assert.deepEqual(JSON.parse(res.body).orders, [{ id: 'order_1' }]);
 });
 
+test('account route resends order confirmation only for authenticated owner', async () => {
+  const { createAccountHandler } = require('../src/routes/account');
+  const res = makeRes();
+  const sent = [];
+  const seen = {};
+  const handler = createAccountHandler({
+    authRepo: {
+      findSessionUser: async () => ({ user: { id: 'u1', email: 'buyer@example.com', addresses: [] }, rawToken: 'session-token' }),
+    },
+    orderRepo: {
+      getOrder: async (sessionId, id, email) => {
+        Object.assign(seen, { sessionId, id, email });
+        return {
+          storage: 'database',
+          order: {
+            id,
+            contact: { email: 'buyer@example.com' },
+            items: [],
+            total: 100,
+          },
+        };
+      },
+    },
+    emailService: {
+      sendOrderConfirmation: async payload => {
+        sent.push(payload);
+        return { sent: true };
+      },
+    },
+  });
+
+  await handler(makeReq({
+    method: 'POST',
+    url: '/api/account/orders/order_1/resend-confirmation',
+    headers: { 'x-velkor-session': 'guest_1' },
+  }), res, null);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(seen, { sessionId: 'guest_1', id: 'order_1', email: 'buyer@example.com' });
+  assert.deepEqual(JSON.parse(res.body), { ok: true, email: { sent: true } });
+  assert.equal(sent[0].to, 'buyer@example.com');
+  assert.equal(sent[0].order.id, 'order_1');
+});
+
+test('account route lists available customer coupons', async () => {
+  const { createAccountHandler } = require('../src/routes/account');
+  const res = makeRes();
+  const handler = createAccountHandler({
+    authRepo: {
+      findSessionUser: async () => ({ user: { id: 'u1', email: 'buyer@example.com', addresses: [] }, rawToken: 'session-token' }),
+    },
+    couponRepo: {
+      listPublicCoupons: async () => ({
+        coupons: [{ code: 'VOLKERR10', discountType: 'PERCENT', discountValue: 10, active: true }],
+        storage: 'database',
+      }),
+    },
+  });
+
+  await handler(makeReq({ method: 'GET', url: '/api/account/coupons' }), res, null);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body).coupons, [{ code: 'VOLKERR10', discountType: 'PERCENT', discountValue: 10, active: true }]);
+});
+
 test('account route updates the authenticated profile', async () => {
   const { createAccountHandler } = require('../src/routes/account');
   const res = makeRes();

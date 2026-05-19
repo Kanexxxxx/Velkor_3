@@ -78,6 +78,17 @@ export interface AdminSettings {
   };
 }
 
+export interface AdminAuditLog {
+  id: string;
+  action: string;
+  adminUserId: string | null;
+  adminEmail: string | null;
+  targetType: string;
+  targetId: string | null;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface AdminProduct {
   id: string;
   slug: string;
@@ -124,6 +135,20 @@ export interface AdminProductImportPreview {
     truncated?: boolean;
   };
   storage: 'preview';
+}
+
+export interface AdminProductImportResult {
+  filename: string;
+  createdCount: number;
+  failedCount: number;
+  truncated?: boolean;
+  results: Array<{
+    rowNumber: number;
+    status: 'created' | 'invalid' | 'failed';
+    errors?: string[];
+    product: Partial<AdminProduct>;
+  }>;
+  storage: 'database';
 }
 
 export class AdminApiError extends Error {
@@ -182,6 +207,11 @@ export async function fetchAdminSettings() {
   return data.settings;
 }
 
+export async function fetchAdminAuditLogs() {
+  const data = await request<{ logs: AdminAuditLog[]; storage?: string }>('/api/admin/logs');
+  return data.logs ?? [];
+}
+
 export async function createAdminProduct(payload: Partial<AdminProduct>) {
   const data = await request<{ product: AdminProduct }>('/api/admin/products', {
     method: 'POST',
@@ -207,6 +237,13 @@ export async function uploadAdminProductImage(input: { filename: string; dataUrl
 
 export async function previewAdminProductImport(input: { filename: string; csv: string }) {
   return request<AdminProductImportPreview>('/api/admin/products/import/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function importAdminProducts(input: { filename: string; csv: string }) {
+  return request<AdminProductImportResult>('/api/admin/products/import', {
     method: 'POST',
     body: JSON.stringify(input),
   });

@@ -160,6 +160,21 @@ function toNewsletterSubscriber(subscriber) {
   };
 }
 
+function toAdminAuditLog(log) {
+  if (!log) return null;
+  const metadata = log.metadata && typeof log.metadata === 'object' ? log.metadata : {};
+  return {
+    id: log.id,
+    action: log.action,
+    adminUserId: log.actorId || metadata.adminUserId || null,
+    adminEmail: log.actor?.email || null,
+    targetType: log.entity || metadata.targetType || '',
+    targetId: log.entityId || metadata.targetId || null,
+    timestamp: log.createdAt instanceof Date ? log.createdAt.toISOString() : log.createdAt,
+    metadata,
+  };
+}
+
 function toAdminProduct(product) {
   if (!product) return null;
   return {
@@ -417,6 +432,17 @@ async function listAdminOrders() {
   return { orders: orders.map(toApiOrder), storage: 'database' };
 }
 
+async function listAdminAuditLogs({ take = 50 } = {}) {
+  const prisma = getPrisma();
+  if (!prisma) return { logs: [], storage: 'demo' };
+  const logs = await prisma.adminAuditLog.findMany({
+    take: Math.min(Math.max(Number(take) || 50, 1), 100),
+    include: { actor: { select: { email: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  return { logs: logs.map(toAdminAuditLog).filter(Boolean), storage: 'database' };
+}
+
 async function updateOrderStatus(id, status, adminUserId) {
   const prisma = getPrisma();
   if (!prisma) return { order: null, storage: 'demo' };
@@ -483,6 +509,23 @@ async function listCoupons() {
   const prisma = getPrisma();
   if (!prisma) return { coupons: [], storage: 'demo' };
   const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } });
+  return { coupons: coupons.map(toAdminCoupon), storage: 'database' };
+}
+
+async function listPublicCoupons() {
+  const prisma = getPrisma();
+  if (!prisma) return { coupons: [], storage: 'demo' };
+  const now = new Date();
+  const coupons = await prisma.coupon.findMany({
+    where: {
+      active: true,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: now } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
   return { coupons: coupons.map(toAdminCoupon), storage: 'database' };
 }
 
@@ -624,12 +667,15 @@ module.exports = {
   createCoupon,
   createProduct,
   listAdminOrders,
+  listAdminAuditLogs,
   listAdminProducts,
   listAdminUsers,
   listCoupons,
+  listPublicCoupons,
   listNewsletterSubscribers,
   logAdminAction,
   toAdminUser,
+  toAdminAuditLog,
   toAdminProduct,
   updateAdminUser,
   updateCoupon,

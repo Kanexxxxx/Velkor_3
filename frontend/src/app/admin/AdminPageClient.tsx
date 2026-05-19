@@ -10,9 +10,11 @@ import {
   createAdminCoupon,
   fetchAdminCoupons,
   fetchAdminUsers,
+  importAdminProducts,
   fetchAdminOrders,
   fetchAdminProducts,
   fetchAdminSettings,
+  fetchAdminAuditLogs,
   fetchNewsletterSubscribers,
   getAdminMe,
   isAdminApiUnavailable,
@@ -27,6 +29,7 @@ import {
   type AdminCoupon,
   type AdminRole,
   type AdminSettings,
+  type AdminAuditLog,
   type AdminUser,
   type AdminProductImportPreview,
   type NewsletterSubscriber,
@@ -64,16 +67,19 @@ const emptyCouponForm = {
 type ProductFormState = typeof emptyProductForm;
 type CouponFormState = typeof emptyCouponForm;
 type UserFormState = Record<string, { name: string; email: string; role: AdminRole; emailVerified: boolean }>;
-export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'coupons' | 'newsletter' | 'settings';
+export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'payments' | 'shipping' | 'coupons' | 'newsletter' | 'settings' | 'logs';
 
 const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: string }> = [
   { key: 'overview', label: 'Visao geral', description: 'Resumo da loja' },
   { key: 'orders', label: 'Pedidos', description: 'Status e envio' },
   { key: 'customers', label: 'Clientes', description: 'Contas e enderecos' },
   { key: 'products', label: 'Produtos', description: 'Catalogo e imagens' },
+  { key: 'payments', label: 'Pagamentos', description: 'Mercado Pago' },
+  { key: 'shipping', label: 'Frete', description: 'Melhor Envio' },
   { key: 'coupons', label: 'Cupons', description: 'Promocoes' },
   { key: 'newsletter', label: 'Newsletter', description: 'Inscritos' },
   { key: 'settings', label: 'Configuracoes', description: 'Integracoes' },
+  { key: 'logs', label: 'Logs', description: 'Auditoria basica' },
 ];
 
 const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
@@ -81,9 +87,12 @@ const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
   orders: '/admin/orders',
   customers: '/admin/customers',
   products: '/admin/products',
+  payments: '/admin/payments',
+  shipping: '/admin/shipping',
   coupons: '/admin/coupons',
   newsletter: '/admin/newsletter',
   settings: '/admin/settings',
+  logs: '/admin/logs',
 };
 
 function fallbackToAdminProduct(product: Product): AdminProduct {
@@ -197,6 +206,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [adminCoupons, setAdminCoupons] = useState<AdminCoupon[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
+  const [adminAuditLogs, setAdminAuditLogs] = useState<AdminAuditLog[]>([]);
   const [userForms, setUserForms] = useState<UserFormState>({});
   const [couponForm, setCouponForm] = useState<CouponFormState>(emptyCouponForm);
   const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm);
@@ -205,8 +215,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productUploading, setProductUploading] = useState(false);
   const [productError, setProductError] = useState('');
   const [productImportPreview, setProductImportPreview] = useState<AdminProductImportPreview | null>(null);
+  const [productImportFile, setProductImportFile] = useState<{ filename: string; csv: string } | null>(null);
   const [productImportLoading, setProductImportLoading] = useState(false);
   const [productImportError, setProductImportError] = useState('');
+  const [productImportSummary, setProductImportSummary] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [productStatusFilter, setProductStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -232,13 +246,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   }
 
   async function loadRealAdminData() {
-    const [remoteOrders, remoteProducts, remoteUsers, remoteCoupons, remoteNewsletter, remoteSettings] = await Promise.all([
+    const [remoteOrders, remoteProducts, remoteUsers, remoteCoupons, remoteNewsletter, remoteSettings, remoteAuditLogs] = await Promise.all([
       fetchAdminOrders(),
       fetchAdminProducts(),
       fetchAdminUsers(),
       fetchAdminCoupons(),
       fetchNewsletterSubscribers(),
       fetchAdminSettings(),
+      fetchAdminAuditLogs(),
     ]);
     setOrders(remoteOrders);
     setAdminProducts(remoteProducts);
@@ -246,6 +261,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     setAdminCoupons(remoteCoupons);
     setNewsletterSubscribers(remoteNewsletter);
     setAdminSettings(remoteSettings);
+    setAdminAuditLogs(remoteAuditLogs);
     setApiMode('real');
     setUnlocked(true);
   }
@@ -312,6 +328,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setAdminCoupons([]);
       setNewsletterSubscribers([]);
       setAdminSettings(null);
+      setAdminAuditLogs([]);
       setApiMode('demo');
       setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
@@ -322,15 +339,35 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const totals = useMemo(() => {
     const revenue = orders.reduce((sum, order) => sum + order.total, 0);
     const pending = orders.filter(order => order.status === 'pending').length;
+    const paid = orders.filter(order => order.status === 'paid' || order.paymentStatus === 'approved').length;
+    const shipped = orders.filter(order => ['shipped', 'fulfilled', 'delivered'].includes(order.status)).length;
     const units = orders.reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
+    const averageTicket = orders.length ? revenue / orders.length : 0;
 
-    return { revenue, pending, units };
+    return { revenue, pending, paid, shipped, units, averageTicket };
   }, [orders]);
 
   const categoryCounts = adminProducts.reduce<Record<string, number>>((counts, product) => {
     counts[product.category] = (counts[product.category] ?? 0) + 1;
     return counts;
   }, {});
+
+  const filteredAdminProducts = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    return adminProducts.filter(product => {
+      const matchesStatus = productStatusFilter === 'all'
+        || (productStatusFilter === 'active' && product.active)
+        || (productStatusFilter === 'inactive' && !product.active);
+      const matchesQuery = !query || [
+        product.id,
+        product.slug,
+        product.name,
+        product.brand,
+        product.category,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [adminProducts, productSearch, productStatusFilter]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -386,7 +423,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     if (!file) return;
     setProductImportLoading(true);
     setProductImportError('');
+    setProductImportSummary('');
     setProductImportPreview(null);
+    setProductImportFile(null);
     try {
       const csv = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -395,11 +434,38 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         reader.readAsText(file, 'utf-8');
       });
       const preview = await previewAdminProductImport({ filename: file.name, csv });
+      setProductImportFile({ filename: file.name, csv });
       setProductImportPreview(preview);
       const firstValid = preview.preview.rows.find(row => row.status === 'valid');
       if (firstValid) setProductForm(importRowToForm(firstValid.product));
     } catch (err) {
       setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel analisar o CSV.');
+    } finally {
+      setProductImportLoading(false);
+    }
+  }
+
+  async function handleProductImportCommit() {
+    if (!productImportFile) return;
+    setProductImportLoading(true);
+    setProductImportError('');
+    setProductImportSummary('');
+    try {
+      const result = await importAdminProducts(productImportFile);
+      setProductImportSummary(`${result.createdCount} produto(s) importado(s). ${result.failedCount} linha(s) exigem revisao.`);
+      const createdProducts = result.results
+        .filter(row => row.status === 'created')
+        .map(row => row.product)
+        .filter((product): product is AdminProduct => Boolean(product.id && product.name));
+      if (createdProducts.length) {
+        setAdminProducts(current => {
+          const byId = new Map(current.map(product => [product.id, product]));
+          createdProducts.forEach(product => byId.set(product.id, product));
+          return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+        });
+      }
+    } catch (err) {
+      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel importar o CSV.');
     } finally {
       setProductImportLoading(false);
     }
@@ -782,8 +848,25 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </div>
                 </div>
                 {productImportError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportError}</p> : null}
+                {productImportSummary ? <p style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportSummary}</p> : null}
                 {productImportPreview ? (
                   <div className="summary-items" style={{ marginTop: 18, marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                    {productImportPreview.preview.validCount > 0 ? (
+                      <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                        <div>
+                          <h5>Importar produtos validos</h5>
+                          <div className="meta">Cria ate 50 produtos por envio. Produtos entram inativos para revisao antes de publicar.</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled={productImportLoading || apiMode !== 'real'}
+                          onClick={handleProductImportCommit}
+                        >
+                          {productImportLoading ? 'Importando...' : `Importar ${productImportPreview.preview.validCount} validos`}
+                        </button>
+                      </div>
+                    ) : null}
                     {productImportPreview.preview.rows.slice(0, 6).map(row => (
                       <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={`${row.rowNumber}-${row.product.id ?? row.product.name}`}>
                         <div>
@@ -989,8 +1072,34 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   ) : null}
                 </div>
               </form>
+              <div className="form-block account-form" style={{ marginBottom: 18 }}>
+                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) minmax(160px, 220px)' }}>
+                  <div className="field">
+                    <label htmlFor="admin-product-search">Buscar produto</label>
+                    <input
+                      id="admin-product-search"
+                      value={productSearch}
+                      onChange={event => setProductSearch(event.target.value)}
+                      placeholder="nome, ID, slug, marca ou categoria"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-status">Status</label>
+                    <select
+                      id="admin-product-status"
+                      value={productStatusFilter}
+                      onChange={event => setProductStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                    >
+                      <option value="all">Todos</option>
+                      <option value="active">Ativos</option>
+                      <option value="inactive">Inativos</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="meta">{filteredAdminProducts.length} produto(s) filtrado(s) de {adminProducts.length} cadastrados.</p>
+              </div>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {adminProducts.slice(0, 12).map(product => (
+                {filteredAdminProducts.slice(0, 12).map(product => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
                     <div>
                       <h5>{product.name}</h5>
@@ -1020,6 +1129,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     </div>
                   </div>
                 ))}
+                {filteredAdminProducts.length === 0 ? (
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Nenhum produto encontrado</h5>
+                    <div className="meta">Ajuste busca ou filtro para localizar outro item.</div>
+                  </div>
+                ) : null}
               </div>
             </section>
 
@@ -1050,6 +1165,99 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                 </div>
               ) : (
                 <p>Configuracoes reais aparecem aqui quando o admin estiver conectado ao backend.</p>
+              )}
+            </section>
+
+            <section className="info-block" hidden={activeSection !== 'payments'}>
+              <h2>Pagamentos</h2>
+              {adminSettings ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Mercado Pago</h5>
+                      <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'producao real'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
+                    </div>
+                    <span className={`order-status ${adminSettings.integrations.mercadoPago.configured ? 'status-paid' : 'status-pending'}`}>
+                      {adminSettings.integrations.mercadoPago.configured ? 'OK' : 'PENDENTE'}
+                    </span>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Pedidos pagos</h5>
+                      <div className="meta">{totals.paid} aprovados - {totals.pending} aguardando pagamento</div>
+                    </div>
+                    <div className="price">{formatPrice(totals.revenue)}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Ticket medio</h5>
+                      <div className="meta">Media simples dos pedidos carregados no painel</div>
+                    </div>
+                    <div className="price">{formatPrice(totals.averageTicket)}</div>
+                  </div>
+                </div>
+              ) : (
+                <p>Conecte o admin real para ver o estado do Mercado Pago.</p>
+              )}
+            </section>
+
+            <section className="info-block" hidden={activeSection !== 'shipping'}>
+              <h2>Frete</h2>
+              {adminSettings ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Melhor Envio</h5>
+                      <div className="meta">{adminSettings.integrations.melhorEnvio.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - ambiente {adminSettings.integrations.melhorEnvio.env} - CEP origem {adminSettings.integrations.melhorEnvio.originCepConfigured ? 'ok' : 'pendente'}</div>
+                    </div>
+                    <span className={`order-status ${adminSettings.integrations.melhorEnvio.configured ? 'status-paid' : 'status-pending'}`}>
+                      {adminSettings.integrations.melhorEnvio.configured ? 'OK' : 'PENDENTE'}
+                    </span>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Pedidos enviados</h5>
+                      <div className="meta">Separacao, envio e entrega registrados no status do pedido</div>
+                    </div>
+                    <div className="price">{totals.shipped}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Politica atual</h5>
+                    <div className="meta">Cotacao real no checkout, servicos filtrados e markup configuravel no backend.</div>
+                  </div>
+                </div>
+              ) : (
+                <p>Conecte o admin real para ver o estado do Melhor Envio.</p>
+              )}
+            </section>
+
+            <section className="info-block" hidden={activeSection !== 'logs'}>
+              <h2>Logs e auditoria</h2>
+              {adminAuditLogs.length ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  {adminAuditLogs.slice(0, 20).map(log => (
+                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={log.id}>
+                      <div>
+                        <h5>{log.action}</h5>
+                        <div className="meta">
+                          {log.targetType || 'registro'} {log.targetId ? `- ${log.targetId}` : ''} - {log.adminEmail || log.adminUserId || 'admin'} - {new Date(log.timestamp).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                      <span className="order-status status-delivered">AUDIT</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Nenhum log carregado</h5>
+                    <div className="meta">Quando voce alterar pedido, produto, cupom, usuario ou newsletter, o registro aparece aqui.</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Seguranca</h5>
+                    <div className="meta">RequireAdmin, rate limit administrativo e sessoes HttpOnly permanecem ativos.</div>
+                  </div>
+                </div>
               )}
             </section>
 

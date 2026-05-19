@@ -1,10 +1,16 @@
-import { Suspense } from 'react';
-import { AccountPageClient } from '../../AccountPageClient';
+import { OrderDetailPageClient } from './OrderDetailPageClient';
+
+interface AccountOrderDetailPageProps {
+  params: Promise<{
+    id: string;
+  }>;
+}
 
 export const metadata = {
   title: 'Detalhe do pedido - Conta VELKOR'
 };
 
-export default function AccountOrderDetailPage() {
-  return <Suspense fallback={null}><AccountPageClient initialTab="orders" /></Suspense>;
+export default async function AccountOrderDetailPage({ params }: AccountOrderDetailPageProps) {
+  const { id } = await params;
+  return <OrderDetailPageClient orderId={id} />;
 }
