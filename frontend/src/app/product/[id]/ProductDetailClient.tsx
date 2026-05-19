@@ -68,6 +68,7 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
     () => catalog.products.filter(item => item.category === product.category && item.id !== product.id).slice(0, 4),
     [catalog.products, product.category, product.id]
   );
+  const categoryLabel = categoryLabels[product.category] ?? product.category;
 
   const discount = product.discount ?? (
     product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0
@@ -133,13 +134,13 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
             <div className="crumbs">
               <Link href="/">Início</Link>
               <span className="sep">/</span>
-              <Link href={`/shop?cat=${product.category}`}>{categoryLabels[product.category]}</Link>
+              <Link href={`/shop?cat=${product.category}`}>{categoryLabel}</Link>
               <span className="sep">/</span>
               <span>{product.name}</span>
             </div>
 
             <div className="eyebrow" style={{ marginBottom: 14 }}>
-              {product.brand.toUpperCase()} · {categoryLabels[product.category].toUpperCase()}
+              {product.brand.toUpperCase()} · {categoryLabel.toUpperCase()}
             </div>
             <h1>{product.name}</h1>
 

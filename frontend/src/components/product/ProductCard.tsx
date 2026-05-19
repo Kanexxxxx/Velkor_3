@@ -21,6 +21,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const saved = isWishlisted(product.id);
 
   const hasSingleSize = product.sizes.length === 1 && product.sizes[0] === 'ONE';
+  const categoryLabel = categoryLabels[product.category] ?? product.category;
 
   const badges = [
     product.badge === 'NEW' ? <span className="badge new" key="new">NOVO</span> : null,
@@ -95,7 +96,7 @@ export function ProductCard({ product }: ProductCardProps) {
         ) : null}
       </div>
       <div className="product-info">
-        <div className="product-cat">{product.brand} · {categoryLabels[product.category]}</div>
+        <div className="product-cat">{product.brand} · {categoryLabel}</div>
         <Link href={`/product/${product.id}`}>
           <h3 className="product-name">{product.name}</h3>
         </Link>
