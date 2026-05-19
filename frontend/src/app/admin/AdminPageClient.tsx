@@ -17,6 +17,7 @@ import {
   getAdminMe,
   isAdminApiUnavailable,
   legacyUnlock,
+  previewAdminProductImport,
   updateAdminCoupon,
   updateAdminOrderStatus,
   updateAdminProduct,
@@ -27,6 +28,7 @@ import {
   type AdminRole,
   type AdminSettings,
   type AdminUser,
+  type AdminProductImportPreview,
   type NewsletterSubscriber,
   type AdminProduct
 } from '@/services/adminApi';
@@ -145,6 +147,26 @@ function formToPayload(form: ProductFormState) {
   };
 }
 
+function importRowToForm(product: AdminProductImportPreview['preview']['rows'][number]['product']): ProductFormState {
+  return {
+    id: product.id ?? '',
+    slug: product.slug ?? product.id ?? '',
+    name: product.name ?? '',
+    category: product.category ?? 'apparel',
+    brand: product.brand ?? 'VOLKERR',
+    price: product.price ? String(product.price) : '',
+    oldPrice: product.oldPrice ? String(product.oldPrice) : '',
+    badge: product.badge ?? '',
+    discount: product.discount !== null && product.discount !== undefined ? String(product.discount) : '',
+    colors: Array.isArray(product.colors) && product.colors.length ? product.colors.join(', ') : '#0a0a0a',
+    image: product.image ?? '',
+    images: Array.isArray(product.images) ? product.images.join(', ') : '',
+    sizes: Array.isArray(product.sizes) && product.sizes.length ? product.sizes.join(', ') : 'P, M, G',
+    tag: product.tag ?? 'imported',
+    active: false,
+  };
+}
+
 function couponToPayload(form: CouponFormState) {
   const discountValue = form.discountType === 'FIXED'
     ? Math.round(Number(form.discountValue) * 100)
@@ -172,6 +194,9 @@ export function AdminPageClient() {
   const [productSaving, setProductSaving] = useState(false);
   const [productUploading, setProductUploading] = useState(false);
   const [productError, setProductError] = useState('');
+  const [productImportPreview, setProductImportPreview] = useState<AdminProductImportPreview | null>(null);
+  const [productImportLoading, setProductImportLoading] = useState(false);
+  const [productImportError, setProductImportError] = useState('');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -344,6 +369,29 @@ export function AdminPageClient() {
       setProductError(err instanceof Error ? err.message : 'Nao foi possivel enviar imagem.');
     } finally {
       setProductUploading(false);
+    }
+  }
+
+  async function handleProductImportPreview(file: File | null) {
+    if (!file) return;
+    setProductImportLoading(true);
+    setProductImportError('');
+    setProductImportPreview(null);
+    try {
+      const csv = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Nao foi possivel ler o CSV.'));
+        reader.readAsText(file, 'utf-8');
+      });
+      const preview = await previewAdminProductImport({ filename: file.name, csv });
+      setProductImportPreview(preview);
+      const firstValid = preview.preview.rows.find(row => row.status === 'valid');
+      if (firstValid) setProductForm(importRowToForm(firstValid.product));
+    } catch (err) {
+      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel analisar o CSV.');
+    } finally {
+      setProductImportLoading(false);
     }
   }
 
@@ -707,6 +755,53 @@ export function AdminPageClient() {
 
             <section className="info-block" hidden={activeSection !== 'products'}>
               <h2>Catalogo admin</h2>
+              <div className="form-block account-form" style={{ marginBottom: 28 }}>
+                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'end' }}>
+                  <div>
+                    <div className="section-num" style={{ marginBottom: 10 }}>IMPORTAR NUVEMSHOP</div>
+                    <p style={{ marginBottom: 14 }}>Envie o CSV exportado da Nuvemshop para validar nomes, precos, imagens e categorias antes de cadastrar.</p>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      disabled={productImportLoading || apiMode !== 'real'}
+                      onChange={event => handleProductImportPreview(event.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                  <div className="meta" style={{ textAlign: 'right' }}>
+                    {productImportLoading ? 'Lendo CSV...' : productImportPreview ? `${productImportPreview.preview.validCount} validos / ${productImportPreview.preview.errorCount} revisar` : 'Preview seguro'}
+                  </div>
+                </div>
+                {productImportError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportError}</p> : null}
+                {productImportPreview ? (
+                  <div className="summary-items" style={{ marginTop: 18, marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                    {productImportPreview.preview.rows.slice(0, 6).map(row => (
+                      <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={`${row.rowNumber}-${row.product.id ?? row.product.name}`}>
+                        <div>
+                          <h5>Linha {row.rowNumber}: {row.product.name || 'Produto sem nome'}</h5>
+                          <div className="meta">
+                            {row.status === 'valid'
+                              ? `${row.product.category} - ${row.product.price ? formatPrice(row.product.price) : 'sem preco'} - ${row.product.importNotes?.stock ?? 'estoque n/a'} un.`
+                              : row.errors.join(' ')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={row.status !== 'valid'}
+                          onClick={() => {
+                            setProductForm(importRowToForm(row.product));
+                            setEditingProductId(null);
+                            setProductError('');
+                          }}
+                        >
+                          Usar no formulario
+                        </button>
+                      </div>
+                    ))}
+                    {productImportPreview.preview.truncated ? <p className="meta">Preview limitado para manter o painel rapido. Importe por lotes menores se necessario.</p> : null}
+                  </div>
+                ) : null}
+              </div>
               <form className="form-block account-form" onSubmit={handleProductSubmit} style={{ marginBottom: 28 }}>
                 <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                   <div className="field">

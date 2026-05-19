@@ -101,6 +101,31 @@ export interface AdminProduct {
   updatedAt: string;
 }
 
+export interface AdminProductImportRow {
+  rowNumber: number;
+  status: 'valid' | 'invalid';
+  errors: string[];
+  product: Partial<AdminProduct> & {
+    importNotes?: {
+      sku: string | null;
+      stock: number | null;
+      description: string | null;
+    };
+  };
+}
+
+export interface AdminProductImportPreview {
+  filename: string;
+  preview: {
+    rows: AdminProductImportRow[];
+    validCount: number;
+    errorCount: number;
+    totalRows: number;
+    truncated?: boolean;
+  };
+  storage: 'preview';
+}
+
 export class AdminApiError extends Error {
   status: number;
 
@@ -175,6 +200,13 @@ export async function updateAdminProduct(id: string, payload: Partial<AdminProdu
 
 export async function uploadAdminProductImage(input: { filename: string; dataUrl: string }) {
   return request<{ url: string; filename: string; mimeType: string; size: number }>('/api/admin/uploads/product-image', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function previewAdminProductImport(input: { filename: string; csv: string }) {
+  return request<AdminProductImportPreview>('/api/admin/products/import/preview', {
     method: 'POST',
     body: JSON.stringify(input),
   });

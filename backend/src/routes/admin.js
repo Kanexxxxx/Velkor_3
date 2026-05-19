@@ -4,6 +4,7 @@ const { requireAdmin, sendJson } = require('./guards');
 const { saveProductImageUpload } = require('../services/uploads');
 const { createEmailClient } = require('../services/email');
 const { sendOrderShippedIfNeeded } = require('../services/order-email');
+const { parseNuvemshopProductCsv } = require('../services/nuvemshop-import');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
 const WRITE_LIMIT = { limit: 20, windowMs: 60 * 1000 };
@@ -128,6 +129,21 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
 
       if (url.pathname === '/api/admin/products' && req.method === 'POST') {
         sendJson(res, 201, await repo.createProduct(await readJson(req), adminUserId), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname === '/api/admin/products/import/preview' && req.method === 'POST') {
+        const payload = JSON.parse(await readBody(req, 2 * 1024 * 1024) || '{}');
+        const csv = typeof payload.csv === 'string' ? payload.csv : '';
+        if (!csv.trim()) {
+          sendJson(res, 400, { error: 'Arquivo CSV vazio.' }, corsOrigin);
+          return true;
+        }
+        sendJson(res, 200, {
+          filename: typeof payload.filename === 'string' ? payload.filename.slice(0, 180) : 'catalogo.csv',
+          preview: parseNuvemshopProductCsv(csv),
+          storage: 'preview',
+        }, corsOrigin);
         return true;
       }
 
