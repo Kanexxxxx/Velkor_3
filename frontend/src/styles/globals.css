@@ -3314,6 +3314,9 @@ section { position: relative; }
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+.order-timeline-card {
+  margin-bottom: 24px;
+}
 
 /* Wishlist actions */
 .wishlist-actions { display: flex; gap: 10px; flex-wrap: wrap; }

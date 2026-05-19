@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCart } from '@/components/cart/CartProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
+import { SectionCard, StatusBadge, Timeline, type TimelineItem } from '@/components/operational';
 import { getOrder, isAccountApiUnavailable, resendOrderConfirmation } from '@/services/accountApi';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
 import { createPaymentPreference } from '@/services/paymentsApi';
@@ -46,6 +47,44 @@ function shippingMethodLabel(shipping: string | undefined) {
   if (value.includes('pac')) return 'PAC';
   if (value.includes('express')) return 'Expressa';
   return 'Padrao';
+}
+
+function buildOrderTimeline(order: Order): TimelineItem[] {
+  if (order.status === 'cancelled') {
+    return [
+      { title: 'Pedido criado', description: formatDate(order.createdAt), state: 'complete' },
+      { title: 'Pedido cancelado', description: 'Este pedido nao segue para pagamento ou envio.', state: 'danger' },
+    ];
+  }
+
+  const paymentApproved = order.paymentStatus === 'approved' || ['paid', 'processing', 'shipped', 'fulfilled', 'delivered'].includes(order.status);
+  const preparing = ['processing', 'shipped', 'fulfilled', 'delivered'].includes(order.status);
+  const shipped = ['shipped', 'fulfilled', 'delivered'].includes(order.status);
+  const delivered = ['fulfilled', 'delivered'].includes(order.status);
+
+  return [
+    { title: 'Pedido criado', description: formatDate(order.createdAt), state: 'complete' },
+    {
+      title: paymentApproved ? 'Pagamento aprovado' : 'Aguardando pagamento',
+      description: paymentApproved ? 'Pagamento confirmado no sistema.' : 'Finalize pelo Mercado Pago para confirmar o pedido.',
+      state: paymentApproved ? 'complete' : 'current',
+    },
+    {
+      title: 'Em separacao',
+      description: 'A equipe prepara os itens para envio.',
+      state: preparing ? 'complete' : 'pending',
+    },
+    {
+      title: 'Enviado',
+      description: shipped ? 'Pedido saiu para transporte.' : 'O codigo de rastreio aparece aqui quando for enviado.',
+      state: shipped ? 'complete' : 'pending',
+    },
+    {
+      title: 'Entregue',
+      description: delivered ? 'Entrega concluida.' : 'Aguardando atualizacao final.',
+      state: delivered ? 'complete' : 'pending',
+    },
+  ];
 }
 
 export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
@@ -226,6 +265,19 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
             <span className="stat-label">Total</span>
           </div>
         </section>
+
+        <SectionCard
+          title="Linha do tempo"
+          description="Acompanhe o andamento do pedido sem precisar falar com suporte."
+          actions={(
+            <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
+              {paymentStatusLabel(order.paymentStatus)}
+            </StatusBadge>
+          )}
+          className="order-timeline-card"
+        >
+          <Timeline items={buildOrderTimeline(order)} />
+        </SectionCard>
 
         <section className="account-shell">
           <article className="account-panel">
