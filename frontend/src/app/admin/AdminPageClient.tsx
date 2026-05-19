@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ActionButton, PageHeader, StatCard, StatusBadge } from '@/components/operational';
+import { ActionButton, PageHeader, SectionCard, StatCard, StatusBadge } from '@/components/operational';
 import { getInfoHref } from '@/services/infoPages';
 import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
@@ -351,6 +351,29 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
 
     return { revenue, pending, paid, shipped, units, averageTicket };
   }, [orders]);
+
+  const topProducts = useMemo(() => {
+    const counts = new Map<string, { quantity: number; revenue: number }>();
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const current = counts.get(item.productId) ?? { quantity: 0, revenue: 0 };
+        current.quantity += item.quantity;
+        current.revenue += (item.unitPrice ?? 0) * item.quantity;
+        counts.set(item.productId, current);
+      });
+    });
+    return Array.from(counts.entries())
+      .map(([productId, value]) => {
+        const product = adminProducts.find(item => item.id === productId || item.slug === productId);
+        return {
+          productId,
+          name: product?.name ?? productId,
+          ...value,
+        };
+      })
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+  }, [adminProducts, orders]);
 
   const categoryCounts = adminProducts.reduce<Record<string, number>>((counts, product) => {
     counts[product.category] = (counts[product.category] ?? 0) + 1;
@@ -744,6 +767,50 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           </aside>
 
           <article className="info-content">
+            {activeSection === 'overview' ? (
+            <SectionCard
+              title="Pulso da operacao"
+              description="Resumo rapido para abrir o painel e entender o que precisa de atencao."
+              className="admin-dashboard-pulse"
+            >
+              <div className="admin-pulse-grid">
+                <div>
+                  <span>Backend</span>
+                  <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode === 'real' ? 'Online' : 'Fallback'}</StatusBadge>
+                </div>
+                <div>
+                  <span>Mercado Pago</span>
+                  <StatusBadge tone={adminSettings?.integrations.mercadoPago.configured ? 'success' : 'warning'}>
+                    {adminSettings?.integrations.mercadoPago.configured ? 'Configurado' : 'Pendente'}
+                  </StatusBadge>
+                </div>
+                <div>
+                  <span>SMTP</span>
+                  <StatusBadge tone={adminSettings?.integrations.email.configured ? 'success' : 'warning'}>
+                    {adminSettings?.integrations.email.configured ? 'Configurado' : 'Pendente'}
+                  </StatusBadge>
+                </div>
+                <div>
+                  <span>Melhor Envio</span>
+                  <StatusBadge tone={adminSettings?.integrations.melhorEnvio.configured ? 'success' : 'warning'}>
+                    {adminSettings?.integrations.melhorEnvio.configured ? 'Configurado' : 'Pendente'}
+                  </StatusBadge>
+                </div>
+              </div>
+              {topProducts.length ? (
+                <div className="admin-top-products">
+                  <h3>Produtos mais vendidos</h3>
+                  {topProducts.map(product => (
+                    <div key={product.productId}>
+                      <strong>{product.name}</strong>
+                      <span>{product.quantity} un. - {formatPrice(product.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </SectionCard>
+            ) : null}
+
             <section className="info-block" hidden={!['overview', 'orders'].includes(activeSection)}>
               <h2>Pedidos recentes</h2>
               {orders.length ? (
