@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useCart } from '@/components/cart/CartProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
 import { getOrder, isAccountApiUnavailable, resendOrderConfirmation } from '@/services/accountApi';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
@@ -49,6 +50,7 @@ function shippingMethodLabel(shipping: string | undefined) {
 
 export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
   const { user, isAuthenticated, isReady } = useAuth();
+  const { addItem } = useCart();
   const { notify } = useNotifications();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,6 +174,20 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
     }
   }
 
+  function handleBuyAgain() {
+    if (!order) return;
+    order.items.forEach(item => {
+      addItem({
+        productId: item.productId,
+        size: item.size,
+        color: item.color,
+        quantity: item.quantity,
+      });
+    });
+    notify(`${order.items.length} item(ns) do pedido foram adicionados a sacola.`, 'success');
+    window.dispatchEvent(new Event('velkor:open-cart'));
+  }
+
   return (
     <main className="info-page account-dashboard">
       <div className="container">
@@ -222,6 +238,9 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
                 <button type="button" className="btn btn-ghost" onClick={() => setRefreshKey(key => key + 1)}>Atualizar</button>
                 <button type="button" className="btn btn-ghost" disabled={resendingEmail} onClick={handleResendConfirmation}>
                   {resendingEmail ? 'Reenviando...' : 'Reenviar confirmacao'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={handleBuyAgain}>
+                  Comprar novamente
                 </button>
                 {canPayAgain ? (
                   <button type="button" className="btn btn-primary" disabled={paying} onClick={handlePayAgain}>
