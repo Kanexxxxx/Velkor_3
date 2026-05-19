@@ -579,6 +579,9 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
                   {address ? <div><dt>Endereço</dt><dd>{address.street}, {address.city}/{address.region}</dd></div> : null}
                 </dl>
                 <div className="order-actions">
+                  <Link className="btn btn-ghost" href={`/account/orders/${encodeURIComponent(order.id)}`}>
+                    Ver detalhes
+                  </Link>
                   {canPayAgain ? (
                     <button
                       type="button"
