@@ -219,6 +219,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productImportLoading, setProductImportLoading] = useState(false);
   const [productImportError, setProductImportError] = useState('');
   const [productImportSummary, setProductImportSummary] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [productStatusFilter, setProductStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -349,6 +351,23 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     counts[product.category] = (counts[product.category] ?? 0) + 1;
     return counts;
   }, {});
+
+  const filteredAdminProducts = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    return adminProducts.filter(product => {
+      const matchesStatus = productStatusFilter === 'all'
+        || (productStatusFilter === 'active' && product.active)
+        || (productStatusFilter === 'inactive' && !product.active);
+      const matchesQuery = !query || [
+        product.id,
+        product.slug,
+        product.name,
+        product.brand,
+        product.category,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [adminProducts, productSearch, productStatusFilter]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1053,8 +1072,34 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   ) : null}
                 </div>
               </form>
+              <div className="form-block account-form" style={{ marginBottom: 18 }}>
+                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) minmax(160px, 220px)' }}>
+                  <div className="field">
+                    <label htmlFor="admin-product-search">Buscar produto</label>
+                    <input
+                      id="admin-product-search"
+                      value={productSearch}
+                      onChange={event => setProductSearch(event.target.value)}
+                      placeholder="nome, ID, slug, marca ou categoria"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="admin-product-status">Status</label>
+                    <select
+                      id="admin-product-status"
+                      value={productStatusFilter}
+                      onChange={event => setProductStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                    >
+                      <option value="all">Todos</option>
+                      <option value="active">Ativos</option>
+                      <option value="inactive">Inativos</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="meta">{filteredAdminProducts.length} produto(s) filtrado(s) de {adminProducts.length} cadastrados.</p>
+              </div>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {adminProducts.slice(0, 12).map(product => (
+                {filteredAdminProducts.slice(0, 12).map(product => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
                     <div>
                       <h5>{product.name}</h5>
@@ -1084,6 +1129,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     </div>
                   </div>
                 ))}
+                {filteredAdminProducts.length === 0 ? (
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Nenhum produto encontrado</h5>
+                    <div className="meta">Ajuste busca ou filtro para localizar outro item.</div>
+                  </div>
+                ) : null}
               </div>
             </section>
 
