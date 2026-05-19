@@ -72,6 +72,7 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
   const discount = product.discount ?? (
     product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0
   );
+  const canPurchase = product.price > 0 && detailState.status !== 'error';
 
   const tabContent: Record<TabId, string[]> = {
     desc: [
@@ -202,7 +203,9 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
               <button
                 className="pdp-buy"
                 type="button"
+                disabled={!canPurchase}
                 onClick={() => {
+                  if (!canPurchase) return;
                   addItem({
                     productId: product.id,
                     quantity,
@@ -213,7 +216,7 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
                   window.dispatchEvent(new Event('velkor:open-cart'));
                 }}
               >
-                Adicionar à sacola <span>{formatPrice(product.price * quantity)}</span>
+                {canPurchase ? 'Adicionar à sacola' : 'Produto indisponível'} <span>{formatPrice(product.price * quantity)}</span>
               </button>
               <button
                 className={`pdp-wish${saved ? ' active' : ''}`}
