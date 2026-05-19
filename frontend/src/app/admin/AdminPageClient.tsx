@@ -235,6 +235,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
   const [activeSection, setActiveSection] = useState<AdminSection>(initialSection);
 
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
+
   function applyAdminUsers(users: AdminUser[]) {
     setAdminUsers(users);
     setUserForms(Object.fromEntries(users.map(user => [user.id, {
@@ -699,6 +703,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   key={section.key}
                   href={ADMIN_SECTION_HREFS[section.key]}
                   className={`admin-nav-button${activeSection === section.key ? ' active' : ''}`}
+                  scroll={false}
                   onClick={() => setActiveSection(section.key)}
                 >
                   <strong>{section.label}</strong>

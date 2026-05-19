@@ -379,6 +379,7 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
                 key={item.key}
                 href={`/account?tab=${item.key}`}
                 className={item.key === tab ? 'active' : undefined}
+                scroll={false}
               >
                 <strong>{item.label}</strong>
                 <span>{item.description}</span>
