@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ActionButton, PageHeader, StatCard, StatusBadge } from '@/components/operational';
 import { getInfoHref } from '@/services/infoPages';
 import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
@@ -649,7 +650,22 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           <span>Admin</span>
         </div>
 
-        <section className="info-hero">
+        <PageHeader
+          eyebrow="PAINEL ADMIN"
+          title={<>Controle <span className="red">Velkor.</span></>}
+          description={apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}
+          actions={(
+            <>
+              <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode}</StatusBadge>
+              <ActionButton type="button" tone="secondary" onClick={refreshAdminData} loading={loading}>
+                Atualizar
+              </ActionButton>
+              <Link href="/shop" className="btn btn-primary">Ver loja</Link>
+            </>
+          )}
+        />
+
+        <section className="info-hero admin-legacy-hero" hidden>
           <div>
             <div className="section-num">PAINEL ADMIN</div>
             <h1>Controle <span className="red">Velkor.</span></h1>
@@ -663,13 +679,21 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           </div>
         </section>
 
+        <section className="admin-stat-grid" style={{ marginBottom: 32 }}>
+          <StatCard label="Receita" value={formatPrice(totals.revenue)} tone={totals.revenue > 0 ? 'success' : 'default'} />
+          <StatCard label="Pedidos" value={orders.length} hint={`${totals.pending} pendentes`} />
+          <StatCard label="Produtos" value={adminProducts.length} hint="itens cadastrados" />
+          <StatCard label="Clientes" value={adminUsers.length} hint="contas reais" />
+          <StatCard label="Unidades vendidas" value={totals.units} hint={apiMode === 'real' ? 'registradas' : 'storage local'} />
+        </section>
+
         {error ? (
           <section className="info-content" style={{ marginBottom: 24 }}>
             <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p>
           </section>
         ) : null}
 
-        <section className="info-content" style={{ marginBottom: 32 }}>
+        <section className="info-content" style={{ marginBottom: 32 }} hidden>
           <div className="account-grid">
             <div className="info-block">
               <h2>Receita demo</h2>
