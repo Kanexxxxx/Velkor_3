@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
-import { EmptyState, SectionCard, StatusBadge } from '@/components/operational';
+import { ConfirmDialog, EmptyState, SectionCard, StatusBadge } from '@/components/operational';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
@@ -733,6 +733,8 @@ function AddressesPanel() {
   const { notify } = useNotifications();
   const [editing, setEditing] = useState<Address | null>(null);
   const [open, setOpen] = useState(false);
+  const [addressToRemove, setAddressToRemove] = useState<Address | null>(null);
+  const [addressRemoving, setAddressRemoving] = useState(false);
 
   if (!user) return null;
 
@@ -806,7 +808,7 @@ function AddressesPanel() {
                     Tornar padrão
                   </button>
                 ) : null}
-                <button type="button" className="danger" onClick={async () => { await removeAddress(address.id); notify('Endereço removido.', 'info'); }}>
+                <button type="button" className="danger" onClick={() => setAddressToRemove(address)}>
                   Remover
                 </button>
               </div>
@@ -847,6 +849,28 @@ function AddressesPanel() {
           </div>
         </form>
       ) : null}
+      <ConfirmDialog
+        open={Boolean(addressToRemove)}
+        title="Remover endereco?"
+        description="Este endereco deixa de aparecer no checkout rapido, mas seus pedidos antigos continuam preservados."
+        confirmLabel="Remover"
+        danger
+        loading={addressRemoving}
+        onCancel={() => setAddressToRemove(null)}
+        onConfirm={async () => {
+          if (!addressToRemove) return;
+          try {
+            setAddressRemoving(true);
+            await removeAddress(addressToRemove.id);
+            notify('Endereco removido.', 'info');
+            setAddressToRemove(null);
+          } catch (error) {
+            notify((error as Error).message, 'error');
+          } finally {
+            setAddressRemoving(false);
+          }
+        }}
+      />
     </article>
   );
 }
