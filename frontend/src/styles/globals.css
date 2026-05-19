@@ -3320,6 +3320,12 @@ section { position: relative; }
 
 /* Wishlist actions */
 .wishlist-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.wishlist-health {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
 
 /* Toast stack */
 .toast-stack {

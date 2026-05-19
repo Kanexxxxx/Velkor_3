@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SectionCard } from '@/components/operational';
 import { getInfoHref } from '@/services/infoPages';
 
 export const metadata = {
@@ -25,19 +26,17 @@ export default function AccountSupportPage() {
           <Link href="/account/orders" className="btn btn-primary">Ver meus pedidos</Link>
         </section>
         <section className="info-content">
-          <div className="info-block">
-            <h2>Canais oficiais</h2>
-            <p>Email: velkor.officiall@gmail.com</p>
-            <p>WhatsApp: +55 16 99706-2339</p>
-          </div>
-          <div className="info-block">
-            <h2>Links uteis</h2>
+          <SectionCard title="Canais oficiais" description="Fale com a loja usando os contatos publicos da VOLKERR.">
+            <p>Email: <a href="mailto:velkor.officiall@gmail.com">velkor.officiall@gmail.com</a></p>
+            <p>WhatsApp: <a href="https://wa.me/5516997062339" target="_blank" rel="noreferrer">+55 16 99706-2339</a></p>
+          </SectionCard>
+          <SectionCard title="Ajuda rapida" description="Use estes caminhos antes de abrir um chamado.">
             <div className="account-actions">
               <Link href={getInfoHref('track-order')} className="btn btn-secondary">Rastrear pedido</Link>
               <Link href={getInfoHref('refund-policy')} className="btn btn-secondary">Trocas e devolucoes</Link>
               <Link href={getInfoHref('shipping-returns')} className="btn btn-secondary">Envio e frete</Link>
             </div>
-          </div>
+          </SectionCard>
         </section>
       </div>
     </main>

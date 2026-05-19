@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
+import { EmptyState, LoadingSkeleton, StatusBadge } from '@/components/operational';
 import { isAccountApiUnavailable, listCoupons } from '@/services/accountApi';
 import { formatPrice } from '@/services/products';
 import type { AdminCoupon } from '@/services/adminApi';
@@ -100,15 +101,15 @@ export function CouponsPageClient() {
               <Link className="btn btn-primary" href="/checkout">Ir para checkout</Link>
             </header>
 
-            {loading ? <div className="empty-state"><p>Carregando cupons...</p></div> : null}
-            {error ? <div className="empty-state"><h2>Falha ao carregar.</h2><p>{error}</p></div> : null}
+            {loading ? <LoadingSkeleton lines={4} /> : null}
+            {error ? <EmptyState title="Falha ao carregar" description={error} /> : null}
 
             {!loading && !error && coupons.length === 0 ? (
-              <div className="empty-state">
-                <h2>Nenhum cupom ativo agora.</h2>
-                <p>Quando uma promocao estiver disponivel, ela aparece aqui automaticamente.</p>
-                <Link className="btn btn-primary" href="/shop">Ver produtos</Link>
-              </div>
+              <EmptyState
+                title="Nenhum cupom ativo agora"
+                description="Quando uma promocao estiver disponivel, ela aparece aqui automaticamente."
+                action={<Link className="btn btn-primary" href="/shop">Ver produtos</Link>}
+              />
             ) : null}
 
             {!loading && !error && coupons.length > 0 ? (
@@ -118,6 +119,7 @@ export function CouponsPageClient() {
                     <div>
                       <h5>{coupon.code}</h5>
                       <div className="meta">{couponValue(coupon)} - {couponValidity(coupon)} - {coupon.maxRedemptions ? `${coupon.maxRedemptions - coupon.redeemedCount} usos restantes` : 'uso liberado'}</div>
+                      <StatusBadge tone={coupon.active ? 'success' : 'warning'}>{coupon.active ? 'Ativo' : 'Pausado'}</StatusBadge>
                     </div>
                     <button
                       type="button"
