@@ -64,16 +64,19 @@ const emptyCouponForm = {
 type ProductFormState = typeof emptyProductForm;
 type CouponFormState = typeof emptyCouponForm;
 type UserFormState = Record<string, { name: string; email: string; role: AdminRole; emailVerified: boolean }>;
-export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'coupons' | 'newsletter' | 'settings';
+export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'payments' | 'shipping' | 'coupons' | 'newsletter' | 'settings' | 'logs';
 
 const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: string }> = [
   { key: 'overview', label: 'Visao geral', description: 'Resumo da loja' },
   { key: 'orders', label: 'Pedidos', description: 'Status e envio' },
   { key: 'customers', label: 'Clientes', description: 'Contas e enderecos' },
   { key: 'products', label: 'Produtos', description: 'Catalogo e imagens' },
+  { key: 'payments', label: 'Pagamentos', description: 'Mercado Pago' },
+  { key: 'shipping', label: 'Frete', description: 'Melhor Envio' },
   { key: 'coupons', label: 'Cupons', description: 'Promocoes' },
   { key: 'newsletter', label: 'Newsletter', description: 'Inscritos' },
   { key: 'settings', label: 'Configuracoes', description: 'Integracoes' },
+  { key: 'logs', label: 'Logs', description: 'Auditoria basica' },
 ];
 
 const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
@@ -81,9 +84,12 @@ const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
   orders: '/admin/orders',
   customers: '/admin/customers',
   products: '/admin/products',
+  payments: '/admin/payments',
+  shipping: '/admin/shipping',
   coupons: '/admin/coupons',
   newsletter: '/admin/newsletter',
   settings: '/admin/settings',
+  logs: '/admin/logs',
 };
 
 function fallbackToAdminProduct(product: Product): AdminProduct {
@@ -322,9 +328,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const totals = useMemo(() => {
     const revenue = orders.reduce((sum, order) => sum + order.total, 0);
     const pending = orders.filter(order => order.status === 'pending').length;
+    const paid = orders.filter(order => order.status === 'paid' || order.paymentStatus === 'approved').length;
+    const shipped = orders.filter(order => ['shipped', 'fulfilled', 'delivered'].includes(order.status)).length;
     const units = orders.reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
+    const averageTicket = orders.length ? revenue / orders.length : 0;
 
-    return { revenue, pending, units };
+    return { revenue, pending, paid, shipped, units, averageTicket };
   }, [orders]);
 
   const categoryCounts = adminProducts.reduce<Record<string, number>>((counts, product) => {
@@ -1051,6 +1060,87 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>Configuracoes reais aparecem aqui quando o admin estiver conectado ao backend.</p>
               )}
+            </section>
+
+            <section className="info-block" hidden={activeSection !== 'payments'}>
+              <h2>Pagamentos</h2>
+              {adminSettings ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Mercado Pago</h5>
+                      <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'producao real'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
+                    </div>
+                    <span className={`order-status ${adminSettings.integrations.mercadoPago.configured ? 'status-paid' : 'status-pending'}`}>
+                      {adminSettings.integrations.mercadoPago.configured ? 'OK' : 'PENDENTE'}
+                    </span>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Pedidos pagos</h5>
+                      <div className="meta">{totals.paid} aprovados - {totals.pending} aguardando pagamento</div>
+                    </div>
+                    <div className="price">{formatPrice(totals.revenue)}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Ticket medio</h5>
+                      <div className="meta">Media simples dos pedidos carregados no painel</div>
+                    </div>
+                    <div className="price">{formatPrice(totals.averageTicket)}</div>
+                  </div>
+                </div>
+              ) : (
+                <p>Conecte o admin real para ver o estado do Mercado Pago.</p>
+              )}
+            </section>
+
+            <section className="info-block" hidden={activeSection !== 'shipping'}>
+              <h2>Frete</h2>
+              {adminSettings ? (
+                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Melhor Envio</h5>
+                      <div className="meta">{adminSettings.integrations.melhorEnvio.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - ambiente {adminSettings.integrations.melhorEnvio.env} - CEP origem {adminSettings.integrations.melhorEnvio.originCepConfigured ? 'ok' : 'pendente'}</div>
+                    </div>
+                    <span className={`order-status ${adminSettings.integrations.melhorEnvio.configured ? 'status-paid' : 'status-pending'}`}>
+                      {adminSettings.integrations.melhorEnvio.configured ? 'OK' : 'PENDENTE'}
+                    </span>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <div>
+                      <h5>Pedidos enviados</h5>
+                      <div className="meta">Separacao, envio e entrega registrados no status do pedido</div>
+                    </div>
+                    <div className="price">{totals.shipped}</div>
+                  </div>
+                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                    <h5>Politica atual</h5>
+                    <div className="meta">Cotacao real no checkout, servicos filtrados e markup configuravel no backend.</div>
+                  </div>
+                </div>
+              ) : (
+                <p>Conecte o admin real para ver o estado do Melhor Envio.</p>
+              )}
+            </section>
+
+            <section className="info-block" hidden={activeSection !== 'logs'}>
+              <h2>Logs e auditoria</h2>
+              <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <h5>Auditoria ativa</h5>
+                  <div className="meta">Alteracoes criticas de pedido, produto, cupom e usuario passam pelo backend admin protegido.</div>
+                </div>
+                <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <h5>Seguranca</h5>
+                  <div className="meta">RequireAdmin, rate limit administrativo e sessoes HttpOnly permanecem ativos.</div>
+                </div>
+                <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <h5>Proximo incremento</h5>
+                  <div className="meta">Listagem paginada dos AdminAuditLog direto do PostgreSQL.</div>
+                </div>
+              </div>
             </section>
 
             <section className="info-block" hidden={activeSection !== 'coupons'}>
