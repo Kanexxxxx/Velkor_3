@@ -64,7 +64,7 @@ const emptyCouponForm = {
 type ProductFormState = typeof emptyProductForm;
 type CouponFormState = typeof emptyCouponForm;
 type UserFormState = Record<string, { name: string; email: string; role: AdminRole; emailVerified: boolean }>;
-type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'coupons' | 'newsletter' | 'settings';
+export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'coupons' | 'newsletter' | 'settings';
 
 const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: string }> = [
   { key: 'overview', label: 'Visao geral', description: 'Resumo da loja' },
@@ -75,6 +75,16 @@ const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: str
   { key: 'newsletter', label: 'Newsletter', description: 'Inscritos' },
   { key: 'settings', label: 'Configuracoes', description: 'Integracoes' },
 ];
+
+const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
+  overview: '/admin/dashboard',
+  orders: '/admin/orders',
+  customers: '/admin/customers',
+  products: '/admin/products',
+  coupons: '/admin/coupons',
+  newsletter: '/admin/newsletter',
+  settings: '/admin/settings',
+};
 
 function fallbackToAdminProduct(product: Product): AdminProduct {
   return {
@@ -180,7 +190,7 @@ function couponToPayload(form: CouponFormState) {
   };
 }
 
-export function AdminPageClient() {
+export function AdminPageClient({ initialSection = 'overview' }: { initialSection?: AdminSection } = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [adminProducts, setAdminProducts] = useState<AdminProduct[]>(fallbackProducts.map(fallbackToAdminProduct));
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
@@ -209,7 +219,7 @@ export function AdminPageClient() {
   const [loading, setLoading] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
-  const [activeSection, setActiveSection] = useState<AdminSection>('overview');
+  const [activeSection, setActiveSection] = useState<AdminSection>(initialSection);
 
   function applyAdminUsers(users: AdminUser[]) {
     setAdminUsers(users);
@@ -619,15 +629,15 @@ export function AdminPageClient() {
             <div>
               <h4>Area admin</h4>
               {ADMIN_SECTIONS.map(section => (
-                <button
+                <Link
                   key={section.key}
-                  type="button"
+                  href={ADMIN_SECTION_HREFS[section.key]}
                   className={`admin-nav-button${activeSection === section.key ? ' active' : ''}`}
                   onClick={() => setActiveSection(section.key)}
                 >
                   <strong>{section.label}</strong>
                   <span>{section.description}</span>
-                </button>
+                </Link>
               ))}
             </div>
             <div>
