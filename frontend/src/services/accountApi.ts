@@ -1,5 +1,6 @@
 import type { Address, User } from '@/types/user';
 import type { Order } from '@/types/order';
+import type { AdminCoupon } from '@/services/adminApi';
 import { AuthError, type AuthApiUser } from '@/services/authApi';
 
 function toUser(user: AuthApiUser): User {
@@ -104,4 +105,8 @@ export async function logoutAllSessions() {
 
 export async function requestEmailVerification() {
   await request<{ ok: true }>('/verify-email/resend', { method: 'POST' });
+}
+
+export async function listCoupons() {
+  return request<{ coupons: AdminCoupon[]; storage?: string }>('/coupons');
 }

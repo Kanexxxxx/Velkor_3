@@ -107,6 +107,27 @@ test('account route resends order confirmation only for authenticated owner', as
   assert.equal(sent[0].order.id, 'order_1');
 });
 
+test('account route lists available customer coupons', async () => {
+  const { createAccountHandler } = require('../src/routes/account');
+  const res = makeRes();
+  const handler = createAccountHandler({
+    authRepo: {
+      findSessionUser: async () => ({ user: { id: 'u1', email: 'buyer@example.com', addresses: [] }, rawToken: 'session-token' }),
+    },
+    couponRepo: {
+      listPublicCoupons: async () => ({
+        coupons: [{ code: 'VOLKERR10', discountType: 'PERCENT', discountValue: 10, active: true }],
+        storage: 'database',
+      }),
+    },
+  });
+
+  await handler(makeReq({ method: 'GET', url: '/api/account/coupons' }), res, null);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body).coupons, [{ code: 'VOLKERR10', discountType: 'PERCENT', discountValue: 10, active: true }]);
+});
+
 test('account route updates the authenticated profile', async () => {
   const { createAccountHandler } = require('../src/routes/account');
   const res = makeRes();

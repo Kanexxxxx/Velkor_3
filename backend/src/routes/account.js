@@ -1,5 +1,6 @@
 const authRepoDefault = require('../db/auth');
 const orderRepoDefault = require('../db/orders');
+const adminRepoDefault = require('../db/admin');
 const { getSessionId } = require('../db/session');
 const { requireAuth, sendJson } = require('./guards');
 const { parseCookies } = require('./auth');
@@ -56,7 +57,7 @@ function extractId(pathname, prefix, suffix = '') {
   return decodeURIComponent(id).trim();
 }
 
-function createAccountHandler({ authRepo = authRepoDefault, orderRepo = orderRepoDefault, appConfig = process.env, emailService } = {}) {
+function createAccountHandler({ authRepo = authRepoDefault, orderRepo = orderRepoDefault, couponRepo = adminRepoDefault, appConfig = process.env, emailService } = {}) {
   const accountEmailService = emailService || createEmailClient(appConfig);
   const publicUrl = (appConfig.VELKOR_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
 
@@ -135,6 +136,11 @@ function createAccountHandler({ authRepo = authRepoDefault, orderRepo = orderRep
       if (url.pathname === '/api/account/orders' && req.method === 'GET') {
         const sessionId = getSessionId(req) || '';
         sendJson(res, 200, await orderRepo.listOrders(sessionId, current.user.email), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname === '/api/account/coupons' && req.method === 'GET') {
+        sendJson(res, 200, await couponRepo.listPublicCoupons(), corsOrigin);
         return true;
       }
 

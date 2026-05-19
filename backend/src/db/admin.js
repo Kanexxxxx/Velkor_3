@@ -512,6 +512,23 @@ async function listCoupons() {
   return { coupons: coupons.map(toAdminCoupon), storage: 'database' };
 }
 
+async function listPublicCoupons() {
+  const prisma = getPrisma();
+  if (!prisma) return { coupons: [], storage: 'demo' };
+  const now = new Date();
+  const coupons = await prisma.coupon.findMany({
+    where: {
+      active: true,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: now } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  return { coupons: coupons.map(toAdminCoupon), storage: 'database' };
+}
+
 async function findCategoryBySlug(txOrPrisma, slug) {
   const category = await txOrPrisma.category.findUnique({ where: { slug } });
   if (!category) {
@@ -654,6 +671,7 @@ module.exports = {
   listAdminProducts,
   listAdminUsers,
   listCoupons,
+  listPublicCoupons,
   listNewsletterSubscribers,
   logAdminAction,
   toAdminUser,
