@@ -137,6 +137,20 @@ export interface AdminProductImportPreview {
   storage: 'preview';
 }
 
+export interface AdminProductImportResult {
+  filename: string;
+  createdCount: number;
+  failedCount: number;
+  truncated?: boolean;
+  results: Array<{
+    rowNumber: number;
+    status: 'created' | 'invalid' | 'failed';
+    errors?: string[];
+    product: Partial<AdminProduct>;
+  }>;
+  storage: 'database';
+}
+
 export class AdminApiError extends Error {
   status: number;
 
@@ -223,6 +237,13 @@ export async function uploadAdminProductImage(input: { filename: string; dataUrl
 
 export async function previewAdminProductImport(input: { filename: string; csv: string }) {
   return request<AdminProductImportPreview>('/api/admin/products/import/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function importAdminProducts(input: { filename: string; csv: string }) {
+  return request<AdminProductImportResult>('/api/admin/products/import', {
     method: 'POST',
     body: JSON.stringify(input),
   });

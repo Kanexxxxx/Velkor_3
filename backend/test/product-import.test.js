@@ -77,3 +77,34 @@ test('admin product import preview route is admin protected and returns preview'
   assert.equal(data.preview.rows[0].product.name, 'Produto CSV');
   assert.equal(data.filename, 'tiendanube.csv');
 });
+
+test('admin product import route creates valid CSV products and reports invalid rows', async () => {
+  const { createAdminHandler } = require('../src/routes/admin');
+  const created = [];
+  const handler = createAdminHandler({
+    authRepo: { findSessionUser: async () => ({ user: { id: 'adm_import', role: 'ADMIN' } }) },
+    appConfig: {},
+    repo: {
+      createProduct: async (payload, adminUserId) => {
+        created.push({ payload, adminUserId });
+        return { product: { ...payload, active: false }, storage: 'database' };
+      },
+    },
+  });
+  const res = makeRes();
+  const csv = [
+    'Nome,Preco,Imagem,SKU',
+    'Produto Importado,79.90,https://cdn.test/produto.jpg,SKU-1',
+    'Sem preco,,https://cdn.test/sem-preco.jpg,SKU-2',
+  ].join('\n');
+
+  assert.equal(await handler(makeReq({ url: '/api/admin/products/import', body: { filename: 'tiendanube.csv', csv } }), res, null), true);
+
+  assert.equal(res.statusCode, 201);
+  const data = JSON.parse(res.body);
+  assert.equal(data.createdCount, 1);
+  assert.equal(data.failedCount, 1);
+  assert.equal(created[0].adminUserId, 'adm_import');
+  assert.equal(created[0].payload.id, 'sku-1');
+  assert.equal(created[0].payload.name, 'Produto Importado');
+});

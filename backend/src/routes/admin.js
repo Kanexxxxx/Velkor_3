@@ -152,6 +152,45 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname === '/api/admin/products/import' && req.method === 'POST') {
+        const payload = JSON.parse(await readBody(req, 2 * 1024 * 1024) || '{}');
+        const csv = typeof payload.csv === 'string' ? payload.csv : '';
+        if (!csv.trim()) {
+          sendJson(res, 400, { error: 'Arquivo CSV vazio.' }, corsOrigin);
+          return true;
+        }
+
+        const preview = parseNuvemshopProductCsv(csv, { maxRows: 50 });
+        const results = [];
+        for (const row of preview.rows) {
+          if (row.status !== 'valid') {
+            results.push({ rowNumber: row.rowNumber, status: 'invalid', errors: row.errors, product: row.product });
+            continue;
+          }
+          try {
+            const created = await repo.createProduct(row.product, adminUserId);
+            results.push({ rowNumber: row.rowNumber, status: 'created', product: created.product });
+          } catch (err) {
+            results.push({
+              rowNumber: row.rowNumber,
+              status: 'failed',
+              errors: [err instanceof Error ? err.message : 'Falha ao importar produto.'],
+              product: row.product,
+            });
+          }
+        }
+
+        sendJson(res, 201, {
+          filename: typeof payload.filename === 'string' ? payload.filename.slice(0, 180) : 'catalogo.csv',
+          createdCount: results.filter(row => row.status === 'created').length,
+          failedCount: results.filter(row => row.status !== 'created').length,
+          results,
+          truncated: preview.truncated,
+          storage: 'database',
+        }, corsOrigin);
+        return true;
+      }
+
       if (url.pathname === '/api/admin/uploads/product-image' && req.method === 'POST') {
         if (!uploadRoot) {
           sendJson(res, 503, { error: 'Upload nao configurado.' }, corsOrigin);

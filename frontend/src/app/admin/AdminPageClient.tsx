@@ -10,6 +10,7 @@ import {
   createAdminCoupon,
   fetchAdminCoupons,
   fetchAdminUsers,
+  importAdminProducts,
   fetchAdminOrders,
   fetchAdminProducts,
   fetchAdminSettings,
@@ -214,8 +215,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productUploading, setProductUploading] = useState(false);
   const [productError, setProductError] = useState('');
   const [productImportPreview, setProductImportPreview] = useState<AdminProductImportPreview | null>(null);
+  const [productImportFile, setProductImportFile] = useState<{ filename: string; csv: string } | null>(null);
   const [productImportLoading, setProductImportLoading] = useState(false);
   const [productImportError, setProductImportError] = useState('');
+  const [productImportSummary, setProductImportSummary] = useState('');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -401,7 +404,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     if (!file) return;
     setProductImportLoading(true);
     setProductImportError('');
+    setProductImportSummary('');
     setProductImportPreview(null);
+    setProductImportFile(null);
     try {
       const csv = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -410,11 +415,38 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         reader.readAsText(file, 'utf-8');
       });
       const preview = await previewAdminProductImport({ filename: file.name, csv });
+      setProductImportFile({ filename: file.name, csv });
       setProductImportPreview(preview);
       const firstValid = preview.preview.rows.find(row => row.status === 'valid');
       if (firstValid) setProductForm(importRowToForm(firstValid.product));
     } catch (err) {
       setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel analisar o CSV.');
+    } finally {
+      setProductImportLoading(false);
+    }
+  }
+
+  async function handleProductImportCommit() {
+    if (!productImportFile) return;
+    setProductImportLoading(true);
+    setProductImportError('');
+    setProductImportSummary('');
+    try {
+      const result = await importAdminProducts(productImportFile);
+      setProductImportSummary(`${result.createdCount} produto(s) importado(s). ${result.failedCount} linha(s) exigem revisao.`);
+      const createdProducts = result.results
+        .filter(row => row.status === 'created')
+        .map(row => row.product)
+        .filter((product): product is AdminProduct => Boolean(product.id && product.name));
+      if (createdProducts.length) {
+        setAdminProducts(current => {
+          const byId = new Map(current.map(product => [product.id, product]));
+          createdProducts.forEach(product => byId.set(product.id, product));
+          return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+        });
+      }
+    } catch (err) {
+      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel importar o CSV.');
     } finally {
       setProductImportLoading(false);
     }
@@ -797,8 +829,25 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </div>
                 </div>
                 {productImportError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportError}</p> : null}
+                {productImportSummary ? <p style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportSummary}</p> : null}
                 {productImportPreview ? (
                   <div className="summary-items" style={{ marginTop: 18, marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                    {productImportPreview.preview.validCount > 0 ? (
+                      <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                        <div>
+                          <h5>Importar produtos validos</h5>
+                          <div className="meta">Cria ate 50 produtos por envio. Produtos entram inativos para revisao antes de publicar.</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled={productImportLoading || apiMode !== 'real'}
+                          onClick={handleProductImportCommit}
+                        >
+                          {productImportLoading ? 'Importando...' : `Importar ${productImportPreview.preview.validCount} validos`}
+                        </button>
+                      </div>
+                    ) : null}
                     {productImportPreview.preview.rows.slice(0, 6).map(row => (
                       <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={`${row.rowNumber}-${row.product.id ?? row.product.name}`}>
                         <div>
