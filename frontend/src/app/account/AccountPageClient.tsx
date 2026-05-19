@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
-import { requestEmailVerification } from '@/services/accountApi';
+import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
 import { getInfoHref } from '@/services/infoPages';
 import { loadOrdersForUser, orderStatusLabels } from '@/services/orders';
@@ -287,9 +287,16 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
     let active = true;
     setOrdersLoading(true);
     setOrdersError(null);
-    loadOrdersForUser(user.id)
-      .then(nextOrders => { if (active) setOrders(nextOrders); })
-      .catch(() => { if (active) setOrdersError('Não foi possível carregar os pedidos.'); })
+    listAccountOrders()
+      .then(({ orders: nextOrders }) => { if (active) setOrders(nextOrders); })
+      .catch(async error => {
+        if (!active) return;
+        if (isAccountApiUnavailable(error)) {
+          setOrders(await loadOrdersForUser(user.id));
+        } else {
+          setOrdersError('Não foi possível carregar os pedidos.');
+        }
+      })
       .finally(() => { if (active) setOrdersLoading(false); });
     return () => { active = false; };
   }, [user, tab, ordersRefreshKey]);
