@@ -257,6 +257,13 @@ export async function updateAdminOrderStatus(id: string, status: Order['status']
   return data.order;
 }
 
+export async function resendAdminOrderConfirmation(id: string) {
+  return request<{ ok: boolean; email?: { sent?: boolean; mode?: string } }>(
+    `/api/admin/orders/${encodeURIComponent(id)}/resend-confirmation`,
+    { method: 'POST' },
+  );
+}
+
 export async function fetchAdminUsers() {
   const data = await request<{ users: AdminUser[] }>('/api/admin/users');
   return data.users ?? [];

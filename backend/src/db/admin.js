@@ -465,6 +465,22 @@ async function updateOrderStatus(id, status, adminUserId) {
   return { order: toApiOrder(order), storage: 'database' };
 }
 
+async function getOrderForNotification(id, adminUserId) {
+  const prisma = getPrisma();
+  if (!prisma) return { order: null, storage: 'demo' };
+  const order = await prisma.$transaction(async tx => {
+    const found = await tx.order.findUnique({
+      where: { id },
+      include: { items: true, shippingAddress: true },
+    });
+    if (found) {
+      await logAdminAction(tx, { adminUserId, action: 'order.email.resend_confirmation', targetType: 'order', targetId: id });
+    }
+    return found;
+  });
+  return { order, storage: 'database' };
+}
+
 async function listAdminUsers() {
   const prisma = getPrisma();
   if (!prisma) return { users: [], storage: 'demo' };
@@ -667,6 +683,7 @@ module.exports = {
   createCoupon,
   createProduct,
   listAdminOrders,
+  getOrderForNotification,
   listAdminAuditLogs,
   listAdminProducts,
   listAdminUsers,

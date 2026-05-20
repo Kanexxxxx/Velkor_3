@@ -3,7 +3,7 @@ const authRepoDefault = require('../db/auth');
 const { requireAdmin, sendJson } = require('./guards');
 const { saveProductImageUpload } = require('../services/uploads');
 const { createEmailClient } = require('../services/email');
-const { sendOrderShippedIfNeeded } = require('../services/order-email');
+const { sendOrderConfirmationIfNeeded, sendOrderShippedIfNeeded } = require('../services/order-email');
 const { parseNuvemshopProductCsv } = require('../services/nuvemshop-import');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
@@ -215,6 +215,18 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         const email = await sendOrderShippedIfNeeded({ orderResult: result, emailService: adminEmailService });
         if (email) result.email = email;
         sendJson(res, 200, result, corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/resend-confirmation') && req.method === 'POST') {
+        const id = extractId(url.pathname, '/api/admin/orders/', '/resend-confirmation');
+        const result = await repo.getOrderForNotification(id, adminUserId);
+        if (!result?.order) {
+          sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        const email = await sendOrderConfirmationIfNeeded({ orderResult: result, emailService: adminEmailService });
+        sendJson(res, 200, { ok: true, email }, corsOrigin);
         return true;
       }
 

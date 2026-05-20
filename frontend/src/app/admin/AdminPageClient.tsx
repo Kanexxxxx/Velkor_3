@@ -21,6 +21,7 @@ import {
   isAdminApiUnavailable,
   legacyUnlock,
   previewAdminProductImport,
+  resendAdminOrderConfirmation,
   updateAdminCoupon,
   updateAdminOrderStatus,
   updateAdminProduct,
@@ -239,6 +240,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [couponError, setCouponError] = useState('');
   const [newsletterSavingId, setNewsletterSavingId] = useState<string | null>(null);
   const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
+  const [orderEmailSendingId, setOrderEmailSendingId] = useState<string | null>(null);
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
   const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState<'all' | Order['status']>('all');
   const [adminOrderPage, setAdminOrderPage] = useState(1);
@@ -663,6 +665,21 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     }
   }
 
+  async function handleResendOrderConfirmation(order: Order) {
+    setOrderEmailSendingId(order.id);
+    setError('');
+    try {
+      const result = await resendAdminOrderConfirmation(order.id);
+      setError(result.email?.sent === false
+        ? 'Email nao enviado. Confira SMTP e logs.'
+        : 'Confirmacao do pedido reenviada para o cliente.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a confirmacao.');
+    } finally {
+      setOrderEmailSendingId(null);
+    }
+  }
+
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>, user: AdminUser) {
     event.preventDefault();
     const form = userForms[user.id];
@@ -1005,6 +1022,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           <option value="fulfilled">Enviado</option>
                           <option value="cancelled">Cancelado</option>
                         </select>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => handleResendOrderConfirmation(order)}
+                          disabled={orderEmailSendingId === order.id || apiMode !== 'real'}
+                        >
+                          {orderEmailSendingId === order.id ? 'Enviando...' : 'Reenviar email'}
+                        </button>
                         <div className="price">{formatPrice(order.total)}</div>
                       </div>
                     </div>

@@ -179,6 +179,44 @@ test('admin route updates order status for admins', async () => {
   assert.deepEqual(statusInput, { id: 'order_1', status: 'paid', adminUserId: 'adm_2' });
 });
 
+test('admin route resends order confirmation email for admins', async () => {
+  const { createAdminHandler } = require('../src/routes/admin');
+  const res = makeRes();
+  const sent = [];
+  let requestedOrderId = null;
+  const handler = createAdminHandler({
+    authRepo: { findSessionUser: async () => ({ user: { id: 'adm_email', role: 'ADMIN' } }) },
+    appConfig: {},
+    repo: {
+      getOrderForNotification: async id => {
+        requestedOrderId = id;
+        return {
+          order: {
+            id,
+            email: 'buyer@example.com',
+            totalCents: 1000,
+            items: [{ quantity: 1 }],
+          },
+          storage: 'database',
+        };
+      },
+    },
+    emailService: {
+      sendOrderConfirmation: async payload => {
+        sent.push(payload);
+        return { sent: true, mode: 'smtp' };
+      },
+    },
+  });
+
+  assert.equal(await handler(makeReq({ method: 'POST', url: '/api/admin/orders/order_2/resend-confirmation' }), res, null), true);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(requestedOrderId, 'order_2');
+  assert.equal(sent[0].to, 'buyer@example.com');
+  assert.deepEqual(JSON.parse(res.body).email, { sent: true, mode: 'smtp' });
+});
+
 test('admin route lists audit logs for admins', async () => {
   const { createAdminHandler } = require('../src/routes/admin');
   const res = makeRes();
