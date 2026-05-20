@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ActionButton, EmptyState, PageHeader, SectionCard, StatCard, StatusBadge } from '@/components/operational';
 import { getInfoHref } from '@/services/infoPages';
 import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
@@ -20,7 +21,10 @@ import {
   isAdminApiUnavailable,
   legacyUnlock,
   previewAdminProductImport,
+  resendAdminOrderConfirmation,
+  resendAdminUserVerification,
   updateAdminCoupon,
+  updateAdminOrderShipping,
   updateAdminOrderStatus,
   updateAdminProduct,
   updateAdminUser,
@@ -221,12 +225,30 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productImportSummary, setProductImportSummary] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [productPage, setProductPage] = useState(1);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerRoleFilter, setCustomerRoleFilter] = useState<'all' | AdminRole>('all');
+  const [customerEmailFilter, setCustomerEmailFilter] = useState<'all' | 'verified' | 'pending'>('all');
+  const [customerPage, setCustomerPage] = useState(1);
+  const [auditLogSearch, setAuditLogSearch] = useState('');
+  const [auditLogPage, setAuditLogPage] = useState(1);
+  const [couponSearch, setCouponSearch] = useState('');
+  const [couponStatusFilter, setCouponStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [newsletterSearch, setNewsletterSearch] = useState('');
+  const [newsletterStatusFilter, setNewsletterStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
+  const [userVerificationSendingId, setUserVerificationSendingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [newsletterSavingId, setNewsletterSavingId] = useState<string | null>(null);
   const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
+  const [orderEmailSendingId, setOrderEmailSendingId] = useState<string | null>(null);
+  const [orderShippingSavingId, setOrderShippingSavingId] = useState<string | null>(null);
+  const [orderTrackingDrafts, setOrderTrackingDrafts] = useState<Record<string, string>>({});
+  const [adminOrderSearch, setAdminOrderSearch] = useState('');
+  const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState<'all' | Order['status']>('all');
+  const [adminOrderPage, setAdminOrderPage] = useState(1);
   const [unlocked, setUnlocked] = useState(false);
   const [attempt, setAttempt] = useState('');
   const [error, setError] = useState('');
@@ -234,6 +256,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [apiMode, setApiMode] = useState<'real' | 'legacy' | 'demo'>('demo');
   const [activeSection, setActiveSection] = useState<AdminSection>(initialSection);
+
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
 
   function applyAdminUsers(users: AdminUser[]) {
     setAdminUsers(users);
@@ -347,6 +373,58 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     return { revenue, pending, paid, shipped, units, averageTicket };
   }, [orders]);
 
+  const topProducts = useMemo(() => {
+    const counts = new Map<string, { quantity: number; revenue: number }>();
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const current = counts.get(item.productId) ?? { quantity: 0, revenue: 0 };
+        current.quantity += item.quantity;
+        current.revenue += (item.unitPrice ?? 0) * item.quantity;
+        counts.set(item.productId, current);
+      });
+    });
+    return Array.from(counts.entries())
+      .map(([productId, value]) => {
+        const product = adminProducts.find(item => item.id === productId || item.slug === productId);
+        return {
+          productId,
+          name: product?.name ?? productId,
+          ...value,
+        };
+      })
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+  }, [adminProducts, orders]);
+
+  const adminOrderPageSize = 8;
+  const filteredAdminOrders = useMemo(() => {
+    const query = adminOrderSearch.trim().toLowerCase();
+    return orders.filter(order => {
+      const matchesStatus = adminOrderStatusFilter === 'all' || order.status === adminOrderStatusFilter;
+      const itemText = order.items.map(item => `${item.productId} ${item.name ?? ''}`).join(' ');
+      const matchesQuery = !query || [
+        order.id,
+        order.status,
+        order.paymentStatus,
+        order.paymentPreferenceId,
+        order.contact?.name,
+        order.contact?.email,
+        itemText,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [adminOrderSearch, adminOrderStatusFilter, orders]);
+
+  const adminOrderPageCount = Math.max(1, Math.ceil(filteredAdminOrders.length / adminOrderPageSize));
+  const visibleAdminOrders = filteredAdminOrders.slice(
+    (adminOrderPage - 1) * adminOrderPageSize,
+    adminOrderPage * adminOrderPageSize,
+  );
+
+  useEffect(() => {
+    setAdminOrderPage(1);
+  }, [adminOrderSearch, adminOrderStatusFilter, orders.length]);
+
   const categoryCounts = adminProducts.reduce<Record<string, number>>((counts, product) => {
     counts[product.category] = (counts[product.category] ?? 0) + 1;
     return counts;
@@ -368,6 +446,100 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       return matchesStatus && matchesQuery;
     });
   }, [adminProducts, productSearch, productStatusFilter]);
+
+  const productPageSize = 12;
+  const productPageCount = Math.max(1, Math.ceil(filteredAdminProducts.length / productPageSize));
+  const visibleAdminProducts = filteredAdminProducts.slice(
+    (productPage - 1) * productPageSize,
+    productPage * productPageSize,
+  );
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearch, productStatusFilter, adminProducts.length]);
+
+  const customerPageSize = 6;
+  const filteredAdminUsers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    return adminUsers.filter(user => {
+      const matchesRole = customerRoleFilter === 'all' || user.role === customerRoleFilter;
+      const matchesEmail = customerEmailFilter === 'all'
+        || (customerEmailFilter === 'verified' && user.emailVerified)
+        || (customerEmailFilter === 'pending' && !user.emailVerified);
+      const addressText = user.addresses.map(address => `${address.recipient} ${address.street} ${address.city} ${address.postalCode}`).join(' ');
+      const orderText = user.orders.map(order => `${order.id} ${order.status}`).join(' ');
+      const matchesQuery = !query || [
+        user.name,
+        user.email,
+        user.role,
+        addressText,
+        orderText,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesRole && matchesEmail && matchesQuery;
+    });
+  }, [adminUsers, customerEmailFilter, customerRoleFilter, customerSearch]);
+
+  const customerPageCount = Math.max(1, Math.ceil(filteredAdminUsers.length / customerPageSize));
+  const visibleAdminUsers = filteredAdminUsers.slice(
+    (customerPage - 1) * customerPageSize,
+    customerPage * customerPageSize,
+  );
+
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [adminUsers.length, customerEmailFilter, customerRoleFilter, customerSearch]);
+
+  const auditLogPageSize = 12;
+  const filteredAuditLogs = useMemo(() => {
+    const query = auditLogSearch.trim().toLowerCase();
+    if (!query) return adminAuditLogs;
+    return adminAuditLogs.filter(log => [
+      log.action,
+      log.adminEmail,
+      log.adminUserId,
+      log.targetType,
+      log.targetId,
+    ].some(value => String(value || '').toLowerCase().includes(query)));
+  }, [adminAuditLogs, auditLogSearch]);
+  const auditLogPageCount = Math.max(1, Math.ceil(filteredAuditLogs.length / auditLogPageSize));
+  const visibleAuditLogs = filteredAuditLogs.slice(
+    (auditLogPage - 1) * auditLogPageSize,
+    auditLogPage * auditLogPageSize,
+  );
+
+  useEffect(() => {
+    setAuditLogPage(1);
+  }, [adminAuditLogs.length, auditLogSearch]);
+
+  const filteredAdminCoupons = useMemo(() => {
+    const query = couponSearch.trim().toLowerCase();
+    return adminCoupons.filter(coupon => {
+      const matchesStatus = couponStatusFilter === 'all'
+        || (couponStatusFilter === 'active' && coupon.active)
+        || (couponStatusFilter === 'inactive' && !coupon.active);
+      const matchesQuery = !query || [
+        coupon.code,
+        coupon.discountType,
+        coupon.discountValue,
+        coupon.redeemedCount,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [adminCoupons, couponSearch, couponStatusFilter]);
+
+  const filteredNewsletterSubscribers = useMemo(() => {
+    const query = newsletterSearch.trim().toLowerCase();
+    return newsletterSubscribers.filter(subscriber => {
+      const matchesStatus = newsletterStatusFilter === 'all'
+        || (newsletterStatusFilter === 'active' && subscriber.isActive)
+        || (newsletterStatusFilter === 'inactive' && !subscriber.isActive);
+      const matchesQuery = !query || [
+        subscriber.email,
+        subscriber.source,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [newsletterSearch, newsletterStatusFilter, newsletterSubscribers]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -498,6 +670,42 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     }
   }
 
+  async function handleResendOrderConfirmation(order: Order) {
+    setOrderEmailSendingId(order.id);
+    setError('');
+    try {
+      const result = await resendAdminOrderConfirmation(order.id);
+      setError(result.email?.sent === false
+        ? 'Email nao enviado. Confira SMTP e logs.'
+        : 'Confirmacao do pedido reenviada para o cliente.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a confirmacao.');
+    } finally {
+      setOrderEmailSendingId(null);
+    }
+  }
+
+  async function handleOrderShippingUpdate(order: Order) {
+    const trackingCode = (orderTrackingDrafts[order.id] ?? order.trackingCode ?? '').trim();
+    if (!trackingCode) {
+      setError('Informe o codigo de rastreio antes de marcar como enviado.');
+      return;
+    }
+    setOrderShippingSavingId(order.id);
+    setError('');
+    try {
+      const result = await updateAdminOrderShipping(order.id, trackingCode);
+      setOrders(current => current.map(item => item.id === result.order.id ? result.order : item));
+      setError(result.email?.sent === false
+        ? 'Pedido marcado como enviado, mas o email de envio falhou.'
+        : 'Pedido marcado como enviado e email de rastreio disparado.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar o envio.');
+    } finally {
+      setOrderShippingSavingId(null);
+    }
+  }
+
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>, user: AdminUser) {
     event.preventDefault();
     const form = userForms[user.id];
@@ -525,6 +733,25 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setUserError(err instanceof Error ? err.message : 'Nao foi possivel salvar cliente.');
     } finally {
       setUserSavingId(null);
+    }
+  }
+
+  async function handleResendUserVerification(user: AdminUser) {
+    setUserVerificationSendingId(user.id);
+    setUserError('');
+    try {
+      const result = await resendAdminUserVerification(user.id);
+      if (result.email?.reason === 'already_verified') {
+        setUserError('Este cliente ja esta com email verificado.');
+      } else {
+        setUserError(result.email?.sent === false
+          ? 'Email de verificacao nao enviado. Confira SMTP e logs.'
+          : 'Verificacao reenviada para o cliente.');
+      }
+    } catch (err) {
+      setUserError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a verificacao.');
+    } finally {
+      setUserVerificationSendingId(null);
     }
   }
 
@@ -645,7 +872,22 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           <span>Admin</span>
         </div>
 
-        <section className="info-hero">
+        <PageHeader
+          eyebrow="PAINEL ADMIN"
+          title={<>Controle <span className="red">Velkor.</span></>}
+          description={apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}
+          actions={(
+            <>
+              <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode}</StatusBadge>
+              <ActionButton type="button" tone="secondary" onClick={refreshAdminData} loading={loading}>
+                Atualizar
+              </ActionButton>
+              <Link href="/shop" className="btn btn-primary">Ver loja</Link>
+            </>
+          )}
+        />
+
+        <section className="info-hero admin-legacy-hero" hidden>
           <div>
             <div className="section-num">PAINEL ADMIN</div>
             <h1>Controle <span className="red">Velkor.</span></h1>
@@ -659,13 +901,21 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           </div>
         </section>
 
+        <section className="admin-stat-grid" style={{ marginBottom: 32 }}>
+          <StatCard label="Receita" value={formatPrice(totals.revenue)} tone={totals.revenue > 0 ? 'success' : 'default'} />
+          <StatCard label="Pedidos" value={orders.length} hint={`${totals.pending} pendentes`} />
+          <StatCard label="Produtos" value={adminProducts.length} hint="itens cadastrados" />
+          <StatCard label="Clientes" value={adminUsers.length} hint="contas reais" />
+          <StatCard label="Unidades vendidas" value={totals.units} hint={apiMode === 'real' ? 'registradas' : 'storage local'} />
+        </section>
+
         {error ? (
           <section className="info-content" style={{ marginBottom: 24 }}>
             <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p>
           </section>
         ) : null}
 
-        <section className="info-content" style={{ marginBottom: 32 }}>
+        <section className="info-content" style={{ marginBottom: 32 }} hidden>
           <div className="account-grid">
             <div className="info-block">
               <h2>Receita demo</h2>
@@ -699,6 +949,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   key={section.key}
                   href={ADMIN_SECTION_HREFS[section.key]}
                   className={`admin-nav-button${activeSection === section.key ? ' active' : ''}`}
+                  scroll={false}
                   onClick={() => setActiveSection(section.key)}
                 >
                   <strong>{section.label}</strong>
@@ -715,17 +966,97 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           </aside>
 
           <article className="info-content">
+            {activeSection === 'overview' ? (
+            <SectionCard
+              title="Pulso da operacao"
+              description="Resumo rapido para abrir o painel e entender o que precisa de atencao."
+              className="admin-dashboard-pulse"
+            >
+              <div className="admin-pulse-grid">
+                <div>
+                  <span>Backend</span>
+                  <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode === 'real' ? 'Online' : 'Fallback'}</StatusBadge>
+                </div>
+                <div>
+                  <span>Mercado Pago</span>
+                  <StatusBadge tone={adminSettings?.integrations.mercadoPago.configured ? 'success' : 'warning'}>
+                    {adminSettings?.integrations.mercadoPago.configured ? 'Configurado' : 'Pendente'}
+                  </StatusBadge>
+                </div>
+                <div>
+                  <span>SMTP</span>
+                  <StatusBadge tone={adminSettings?.integrations.email.configured ? 'success' : 'warning'}>
+                    {adminSettings?.integrations.email.configured ? 'Configurado' : 'Pendente'}
+                  </StatusBadge>
+                </div>
+                <div>
+                  <span>Melhor Envio</span>
+                  <StatusBadge tone={adminSettings?.integrations.melhorEnvio.configured ? 'success' : 'warning'}>
+                    {adminSettings?.integrations.melhorEnvio.configured ? 'Configurado' : 'Pendente'}
+                  </StatusBadge>
+                </div>
+              </div>
+              {topProducts.length ? (
+                <div className="admin-top-products">
+                  <h3>Produtos mais vendidos</h3>
+                  {topProducts.map(product => (
+                    <div key={product.productId}>
+                      <strong>{product.name}</strong>
+                      <span>{product.quantity} un. - {formatPrice(product.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </SectionCard>
+            ) : null}
+
             <section className="info-block" hidden={!['overview', 'orders'].includes(activeSection)}>
               <h2>Pedidos recentes</h2>
               {orders.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de pedidos do admin">
+                  <input
+                    value={adminOrderSearch}
+                    onChange={event => setAdminOrderSearch(event.target.value)}
+                    placeholder="Buscar por pedido, cliente, email ou produto"
+                    aria-label="Buscar pedidos"
+                  />
+                  <select
+                    value={adminOrderStatusFilter}
+                    onChange={event => setAdminOrderStatusFilter(event.target.value as 'all' | Order['status'])}
+                    aria-label="Filtrar status dos pedidos"
+                  >
+                    <option value="all">Todos os status</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="paid">Pagos</option>
+                    <option value="fulfilled">Enviados</option>
+                    <option value="cancelled">Cancelados</option>
+                  </select>
+                </div>
+                {visibleAdminOrders.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {orders.slice(0, 6).map(order => (
+                  {visibleAdminOrders.map(order => (
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={order.id}>
                       <div>
                         <h5>{order.id}</h5>
+                        <div className="admin-order-context">
+                          <span>{order.contact?.name || 'Cliente sem nome'}</span>
+                          <span>{order.contact?.email || 'email nao informado'}</span>
+                          <span>{order.items.length} item(ns)</span>
+                          <span>{order.shipping || 'frete nao informado'} - {formatPrice(order.shippingCost)}</span>
+                        </div>
+                        <div className="admin-order-context">
+                          <span>{order.address?.city || 'cidade n/a'}{order.address?.region ? `/${order.address.region}` : ''}</span>
+                          <span>Subtotal {formatPrice(order.subtotal)}</span>
+                          {order.discount > 0 ? <span>Desconto {formatPrice(order.discount)}</span> : null}
+                          {order.trackingCode ? <span>Rastreio {order.trackingCode}</span> : null}
+                        </div>
                         <div className="meta">{order.status.toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
+                          Pagamento {order.paymentStatus || 'pending'}
+                        </StatusBadge>
                         <select
                           value={order.status}
                           onChange={event => handleOrderStatusChange(order, event.target.value as Order['status'])}
@@ -737,11 +1068,62 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           <option value="fulfilled">Enviado</option>
                           <option value="cancelled">Cancelado</option>
                         </select>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => handleResendOrderConfirmation(order)}
+                          disabled={orderEmailSendingId === order.id || apiMode !== 'real'}
+                        >
+                          {orderEmailSendingId === order.id ? 'Enviando...' : 'Reenviar email'}
+                        </button>
+                        <input
+                          value={orderTrackingDrafts[order.id] ?? order.trackingCode ?? ''}
+                          onChange={event => setOrderTrackingDrafts(current => ({ ...current, [order.id]: event.target.value }))}
+                          placeholder="Codigo de rastreio"
+                          aria-label={`Codigo de rastreio do pedido ${order.id}`}
+                          style={{ maxWidth: 180 }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => handleOrderShippingUpdate(order)}
+                          disabled={orderShippingSavingId === order.id || apiMode !== 'real'}
+                        >
+                          {orderShippingSavingId === order.id ? 'Salvando...' : 'Marcar enviado'}
+                        </button>
                         <div className="price">{formatPrice(order.total)}</div>
                       </div>
                     </div>
                   ))}
                 </div>
+                ) : (
+                  <EmptyState
+                    title="Nenhum pedido encontrado"
+                    description="Ajuste a busca ou limpe o filtro de status para ver mais pedidos."
+                  />
+                )}
+                {adminOrderPageCount > 1 ? (
+                  <div className="account-pagination" aria-label="Paginacao de pedidos do admin">
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={adminOrderPage <= 1}
+                      onClick={() => setAdminOrderPage(page => Math.max(1, page - 1))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <span>Pagina {adminOrderPage} de {adminOrderPageCount}</span>
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={adminOrderPage >= adminOrderPageCount}
+                      onClick={() => setAdminOrderPage(page => Math.min(adminOrderPageCount, page + 1))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <p>Nenhum pedido criado ainda. Finalize um checkout para alimentar este painel.</p>
               )}
@@ -751,14 +1133,50 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               <h2>Clientes</h2>
               {userError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 16 }}>{userError}</p> : null}
               {adminUsers.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de clientes do admin">
+                  <input
+                    value={customerSearch}
+                    onChange={event => setCustomerSearch(event.target.value)}
+                    placeholder="Buscar por nome, email, endereco ou pedido"
+                    aria-label="Buscar clientes"
+                  />
+                  <select
+                    value={customerRoleFilter}
+                    onChange={event => setCustomerRoleFilter(event.target.value as 'all' | AdminRole)}
+                    aria-label="Filtrar role dos clientes"
+                  >
+                    <option value="all">Todos os perfis</option>
+                    <option value="CUSTOMER">Clientes</option>
+                    <option value="ADMIN">Admins</option>
+                  </select>
+                  <select
+                    value={customerEmailFilter}
+                    onChange={event => setCustomerEmailFilter(event.target.value as 'all' | 'verified' | 'pending')}
+                    aria-label="Filtrar verificacao de email"
+                  >
+                    <option value="all">Todos emails</option>
+                    <option value="verified">Verificados</option>
+                    <option value="pending">Pendentes</option>
+                  </select>
+                </div>
+                {visibleAdminUsers.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {adminUsers.slice(0, 8).map(user => {
+                  {visibleAdminUsers.map(user => {
                     const form = userForms[user.id] ?? { name: user.name ?? '', email: user.email, role: user.role, emailVerified: user.emailVerified };
                     return (
                       <form className="summary-item" style={{ gridTemplateColumns: '1fr', gap: 16 }} key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
                         <div>
                           <h5>{user.email}</h5>
-                          <div className="meta">{user.role} - {user.emailVerified ? 'email verificado' : 'email pendente'} - {user.orders.length} pedidos</div>
+                          <div className="meta">
+                            {user.name || 'Cliente sem nome'} - {user.orders.length} pedidos - {user.addresses.length} enderecos
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                            <StatusBadge tone={user.role === 'ADMIN' ? 'warning' : 'neutral'}>{user.role}</StatusBadge>
+                            <StatusBadge tone={user.emailVerified ? 'success' : 'warning'}>
+                              {user.emailVerified ? 'Email verificado' : 'Email pendente'}
+                            </StatusBadge>
+                          </div>
                         </div>
                         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
                           <div className="field">
@@ -819,11 +1237,48 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           <button type="submit" className="btn btn-primary" disabled={userSavingId === user.id || apiMode !== 'real'}>
                             {userSavingId === user.id ? 'Salvando...' : 'Salvar cliente'}
                           </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ marginLeft: 10 }}
+                            onClick={() => handleResendUserVerification(user)}
+                            disabled={userVerificationSendingId === user.id || user.emailVerified || apiMode !== 'real'}
+                          >
+                            {userVerificationSendingId === user.id ? 'Enviando...' : 'Reenviar verificacao'}
+                          </button>
                         </div>
                       </form>
                     );
                   })}
                 </div>
+                ) : (
+                  <EmptyState
+                    title="Nenhum cliente encontrado"
+                    description="Ajuste a busca, o perfil ou o status de email para encontrar outros clientes."
+                  />
+                )}
+                {customerPageCount > 1 ? (
+                  <div className="account-pagination" aria-label="Paginacao de clientes do admin">
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={customerPage <= 1}
+                      onClick={() => setCustomerPage(page => Math.max(1, page - 1))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <span>Pagina {customerPage} de {customerPageCount}</span>
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={customerPage >= customerPageCount}
+                      onClick={() => setCustomerPage(page => Math.min(customerPageCount, page + 1))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <p>{apiMode === 'real' ? 'Nenhum cliente cadastrado ainda.' : 'Clientes reais aparecem aqui quando o admin estiver conectado ao PostgreSQL.'}</p>
               )}
@@ -1099,13 +1554,23 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                 <p className="meta">{filteredAdminProducts.length} produto(s) filtrado(s) de {adminProducts.length} cadastrados.</p>
               </div>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {filteredAdminProducts.slice(0, 12).map(product => (
+                {visibleAdminProducts.map(product => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
-                    <div>
+                    <div className="admin-product-row">
+                      <span
+                        className="admin-product-thumb"
+                        style={{ backgroundImage: `url(${product.image})` }}
+                        aria-hidden="true"
+                      />
+                      <div>
                       <h5>{product.name}</h5>
                       <div className="meta">{product.brand} · {product.category}</div>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <StatusBadge tone={product.active ? 'success' : 'neutral'}>
+                        {product.active ? 'Ativo' : 'Inativo'}
+                      </StatusBadge>
                       <div className="price">{formatPrice(product.price)}</div>
                       <button
                         type="button"
@@ -1130,12 +1595,33 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </div>
                 ))}
                 {filteredAdminProducts.length === 0 ? (
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                    <h5>Nenhum produto encontrado</h5>
-                    <div className="meta">Ajuste busca ou filtro para localizar outro item.</div>
-                  </div>
+                  <EmptyState
+                    title="Nenhum produto encontrado"
+                    description="Ajuste busca ou filtro para localizar outro item."
+                  />
                 ) : null}
               </div>
+              {productPageCount > 1 ? (
+                <div className="account-pagination" aria-label="Paginacao de produtos do admin">
+                  <ActionButton
+                    type="button"
+                    tone="secondary"
+                    disabled={productPage <= 1}
+                    onClick={() => setProductPage(page => Math.max(1, page - 1))}
+                  >
+                    Anterior
+                  </ActionButton>
+                  <span>Pagina {productPage} de {productPageCount}</span>
+                  <ActionButton
+                    type="button"
+                    tone="secondary"
+                    disabled={productPage >= productPageCount}
+                    onClick={() => setProductPage(page => Math.min(productPageCount, page + 1))}
+                  >
+                    Proxima
+                  </ActionButton>
+                </div>
+              ) : null}
             </section>
 
             <section className="info-block" hidden={!['overview', 'settings'].includes(activeSection)}>
@@ -1234,8 +1720,18 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             <section className="info-block" hidden={activeSection !== 'logs'}>
               <h2>Logs e auditoria</h2>
               {adminAuditLogs.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de auditoria do admin">
+                  <input
+                    value={auditLogSearch}
+                    onChange={event => setAuditLogSearch(event.target.value)}
+                    placeholder="Buscar por acao, admin, alvo ou ID"
+                    aria-label="Buscar logs de auditoria"
+                  />
+                </div>
+                {visibleAuditLogs.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {adminAuditLogs.slice(0, 20).map(log => (
+                  {visibleAuditLogs.map(log => (
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={log.id}>
                       <div>
                         <h5>{log.action}</h5>
@@ -1247,6 +1743,34 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     </div>
                   ))}
                 </div>
+                ) : (
+                  <EmptyState
+                    title="Nenhum log encontrado"
+                    description="Ajuste a busca para revisar outros eventos administrativos."
+                  />
+                )}
+                {auditLogPageCount > 1 ? (
+                  <div className="account-pagination" aria-label="Paginacao de logs do admin">
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={auditLogPage <= 1}
+                      onClick={() => setAuditLogPage(page => Math.max(1, page - 1))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <span>Pagina {auditLogPage} de {auditLogPageCount}</span>
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={auditLogPage >= auditLogPageCount}
+                      onClick={() => setAuditLogPage(page => Math.min(auditLogPageCount, page + 1))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
@@ -1294,37 +1818,91 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   {couponSaving ? 'Salvando...' : 'Criar cupom'}
                 </button>
               </form>
+              <div className="account-list-tools" aria-label="Filtros de cupons">
+                <input
+                  value={couponSearch}
+                  onChange={event => setCouponSearch(event.target.value)}
+                  placeholder="Buscar cupom por codigo ou tipo"
+                  aria-label="Buscar cupons"
+                />
+                <select
+                  value={couponStatusFilter}
+                  onChange={event => setCouponStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                  aria-label="Filtrar cupons por status"
+                >
+                  <option value="all">Todos</option>
+                  <option value="active">Ativos</option>
+                  <option value="inactive">Inativos</option>
+                </select>
+              </div>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {adminCoupons.slice(0, 8).map(coupon => (
+                {filteredAdminCoupons.slice(0, 12).map(coupon => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={coupon.id}>
                     <div>
                       <h5>{coupon.code}</h5>
-                      <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos - {coupon.active ? 'ativo' : 'inativo'}</div>
+                      <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos</div>
                     </div>
-                    <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
-                      {coupon.active ? 'Desativar' : 'Ativar'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <StatusBadge tone={coupon.active ? 'success' : 'neutral'}>{coupon.active ? 'Ativo' : 'Inativo'}</StatusBadge>
+                      <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
+                        {coupon.active ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
                   </div>
                 ))}
+                {filteredAdminCoupons.length === 0 ? (
+                  <EmptyState
+                    title="Nenhum cupom encontrado"
+                    description="Ajuste a busca ou o status para revisar outros cupons."
+                  />
+                ) : null}
               </div>
             </section>
 
             <section className="info-block" hidden={activeSection !== 'newsletter'}>
               <h2>Newsletter</h2>
               {newsletterSubscribers.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de newsletter">
+                  <input
+                    value={newsletterSearch}
+                    onChange={event => setNewsletterSearch(event.target.value)}
+                    placeholder="Buscar inscrito por email ou origem"
+                    aria-label="Buscar inscritos da newsletter"
+                  />
+                  <select
+                    value={newsletterStatusFilter}
+                    onChange={event => setNewsletterStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                    aria-label="Filtrar inscritos por status"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="active">Ativos</option>
+                    <option value="inactive">Inativos</option>
+                  </select>
+                </div>
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {newsletterSubscribers.slice(0, 10).map(subscriber => (
+                  {filteredNewsletterSubscribers.slice(0, 12).map(subscriber => (
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={subscriber.id}>
                       <div>
                         <h5>{subscriber.email}</h5>
-                        <div className="meta">{subscriber.source} - {subscriber.isActive ? 'ativo' : 'inativo'} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
+                        <div className="meta">{subscriber.source} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
-                        {subscriber.isActive ? 'Desativar' : 'Ativar'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <StatusBadge tone={subscriber.isActive ? 'success' : 'neutral'}>{subscriber.isActive ? 'Ativo' : 'Inativo'}</StatusBadge>
+                        <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
+                          {subscriber.isActive ? 'Desativar' : 'Ativar'}
+                        </button>
+                      </div>
                     </div>
                   ))}
+                  {filteredNewsletterSubscribers.length === 0 ? (
+                    <EmptyState
+                      title="Nenhum inscrito encontrado"
+                      description="Ajuste a busca ou o status para revisar outros inscritos."
+                    />
+                  ) : null}
                 </div>
+                </>
               ) : (
                 <p>Nenhum inscrito na newsletter ainda.</p>
               )}

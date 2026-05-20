@@ -49,6 +49,7 @@ function normalizeProduct(value: unknown): Product | null {
 
   return {
     id: item.id,
+    slug: typeof item.slug === 'string' ? item.slug : item.id,
     name: item.name,
     category: item.category,
     brand: item.brand,

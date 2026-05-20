@@ -4,6 +4,7 @@ export type ProductBadge = 'NEW' | 'TRENDING';
 
 export interface Product {
   id: string;
+  slug?: string;
   name: string;
   category: ProductCategory;
   brand: string;

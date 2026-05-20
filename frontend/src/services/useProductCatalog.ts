@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Product } from '@/types/product';
-import { fallbackCatalog, fetchCatalog, fetchProduct, readCachedCatalog, writeCachedCatalog, type CatalogState } from '@/services/productApi';
+import { fallbackCatalog, fetchCatalog, fetchProduct, writeCachedCatalog, type CatalogState } from '@/services/productApi';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -13,10 +13,9 @@ export interface CatalogLoadState extends CatalogState {
 }
 
 function getInitialCatalogState() {
-  const cached = readCachedCatalog();
   return {
-    catalog: cached ?? { products: [], categories: fallbackCatalog.categories, source: 'api' as const },
-    status: cached ? 'ready' as LoadStatus : 'idle' as LoadStatus,
+    catalog: { products: [], categories: fallbackCatalog.categories, source: 'api' as const },
+    status: 'idle' as LoadStatus,
   };
 }
 
@@ -72,7 +71,7 @@ export function useProductDetail(initialProduct: Product) {
     setStatus('loading');
     setError('');
 
-    fetchProduct(initialProduct.id)
+    fetchProduct(initialProduct.slug || initialProduct.id)
       .then(apiProduct => {
         if (!active) return;
         setProduct(apiProduct);
@@ -112,11 +111,18 @@ export function useProductsById(productIds: string[]) {
     setStatus('loading');
     setError('');
 
-    Promise.all(ids.map(id => fetchProduct(id)))
-      .then(products => {
+    Promise.allSettled(ids.map(id => fetchProduct(id)))
+      .then(results => {
         if (!active) return;
-        setProductsById(Object.fromEntries(products.map(product => [product.id, product])));
-        setStatus('ready');
+        const products = results
+          .filter((result): result is PromiseFulfilledResult<Product> => result.status === 'fulfilled')
+          .map(result => result.value);
+        setProductsById(Object.fromEntries(products.flatMap(product => [
+          [product.id, product],
+          [product.slug || product.id, product],
+        ])));
+        setStatus(products.length === ids.length ? 'ready' : 'error');
+        setError(products.length === ids.length ? '' : 'Alguns produtos da sacola nao foram encontrados.');
       })
       .catch(() => {
         if (!active) return;

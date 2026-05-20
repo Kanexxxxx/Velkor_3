@@ -22,6 +22,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const hasSingleSize = product.sizes.length === 1 && product.sizes[0] === 'ONE';
   const categoryLabel = categoryLabels[product.category] ?? product.category;
+  const productHref = `/product/${encodeURIComponent(product.slug || product.id)}`;
 
   const badges = [
     product.badge === 'NEW' ? <span className="badge new" key="new">NOVO</span> : null,
@@ -49,7 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <article className="product-card" data-id={product.id}>
       <div className="product-media">
-        <Link href={`/product/${product.id}`} tabIndex={showSizePicker ? -1 : undefined}>
+        <Link href={productHref} tabIndex={showSizePicker ? -1 : undefined}>
           <Image src={product.image} alt={product.name} width={800} height={960} sizes="(max-width: 760px) 100vw, (max-width: 1100px) 33vw, 25vw" />
         </Link>
         <div className="product-badge">{badges}</div>
@@ -97,7 +98,7 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
       <div className="product-info">
         <div className="product-cat">{product.brand} · {categoryLabel}</div>
-        <Link href={`/product/${product.id}`}>
+        <Link href={productHref}>
           <h3 className="product-name">{product.name}</h3>
         </Link>
         <div className="product-row">

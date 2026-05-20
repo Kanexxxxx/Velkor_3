@@ -257,6 +257,24 @@ export async function updateAdminOrderStatus(id: string, status: Order['status']
   return data.order;
 }
 
+export async function updateAdminOrderShipping(id: string, trackingCode: string) {
+  const data = await request<{ order: Order; email?: { sent?: boolean; mode?: string } }>(
+    `/api/admin/orders/${encodeURIComponent(id)}/shipping`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ trackingCode }),
+    },
+  );
+  return data;
+}
+
+export async function resendAdminOrderConfirmation(id: string) {
+  return request<{ ok: boolean; email?: { sent?: boolean; mode?: string } }>(
+    `/api/admin/orders/${encodeURIComponent(id)}/resend-confirmation`,
+    { method: 'POST' },
+  );
+}
+
 export async function fetchAdminUsers() {
   const data = await request<{ users: AdminUser[] }>('/api/admin/users');
   return data.users ?? [];
@@ -268,6 +286,13 @@ export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser,
     body: JSON.stringify(patch),
   });
   return data.user;
+}
+
+export async function resendAdminUserVerification(id: string) {
+  return request<{ ok: boolean; email?: { sent?: boolean; mode?: string; reason?: string } }>(
+    `/api/admin/users/${encodeURIComponent(id)}/resend-verification`,
+    { method: 'POST' },
+  );
 }
 
 export async function fetchAdminCoupons() {

@@ -61,7 +61,7 @@ export function ResetPasswordPageClient() {
         <div className="auth-grid auth-grid-single">
           <form className="form-block" onSubmit={handleSubmit}>
             <h3><span className="num">RESET</span> Crie sua nova senha</h3>
-            <div className="sub">{token ? 'Link de recuperacao detectado.' : 'Use o link recebido no email para abrir esta pagina.'}</div>
+            <div className="sub">{token ? 'Link de recuperacao valido detectado.' : 'Use o link recebido no email para abrir esta pagina.'}</div>
 
             <div className="field-row cols-2">
               <div className="field">

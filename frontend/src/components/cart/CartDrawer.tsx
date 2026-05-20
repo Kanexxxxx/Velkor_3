@@ -43,7 +43,21 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
           ) : (
             items.map(item => {
               const product = productsById[item.productId] ?? getProductById(item.productId);
-              if (!product) return null;
+              if (!product) {
+                return (
+                  <article className="cart-item" key={`${item.productId}-${item.size}-${item.color}`}>
+                    <div className="cart-item-info">
+                      <h4>Produto indisponivel</h4>
+                      <div className="meta">ID {item.productId} - tente remover e adicionar novamente.</div>
+                    </div>
+                    <div className="cart-item-right">
+                      <button className="cart-item-remove" type="button" onClick={() => removeItem(item)}>
+                        Remover
+                      </button>
+                    </div>
+                  </article>
+                );
+              }
 
               return (
                 <article className="cart-item" key={`${item.productId}-${item.size}-${item.color}`}>

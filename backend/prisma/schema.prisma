@@ -183,8 +183,10 @@ model Order {
   paymentPreferenceId String?
   paymentExternalId String?
   paidAt         DateTime?
-  shippingMethod String?
-  shippingAddressId String?
+    shippingMethod String?
+    trackingCode   String?
+    shippedAt      DateTime?
+    shippingAddressId String?
   shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
   items          OrderItem[]
   createdAt      DateTime    @default(now())

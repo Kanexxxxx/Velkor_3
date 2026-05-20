@@ -3,7 +3,7 @@ const authRepoDefault = require('../db/auth');
 const { requireAdmin, sendJson } = require('./guards');
 const { saveProductImageUpload } = require('../services/uploads');
 const { createEmailClient } = require('../services/email');
-const { sendOrderShippedIfNeeded } = require('../services/order-email');
+const { sendOrderConfirmationIfNeeded, sendOrderShippedIfNeeded } = require('../services/order-email');
 const { parseNuvemshopProductCsv } = require('../services/nuvemshop-import');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
@@ -218,6 +218,27 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/shipping') && req.method === 'PATCH') {
+        const id = extractId(url.pathname, '/api/admin/orders/', '/shipping');
+        const result = await repo.updateOrderShipping(id, await readJson(req), adminUserId);
+        const email = await sendOrderShippedIfNeeded({ orderResult: result, emailService: adminEmailService });
+        if (email) result.email = email;
+        sendJson(res, 200, result, corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/resend-confirmation') && req.method === 'POST') {
+        const id = extractId(url.pathname, '/api/admin/orders/', '/resend-confirmation');
+        const result = await repo.getOrderForNotification(id, adminUserId);
+        if (!result?.order) {
+          sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        const email = await sendOrderConfirmationIfNeeded({ orderResult: result, emailService: adminEmailService });
+        sendJson(res, 200, { ok: true, email }, corsOrigin);
+        return true;
+      }
+
       if (url.pathname === '/api/admin/users' && req.method === 'GET') {
         sendJson(res, 200, await repo.listAdminUsers(), corsOrigin);
         return true;
@@ -226,6 +247,32 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
       if (url.pathname.startsWith('/api/admin/users/') && req.method === 'PATCH') {
         const id = extractId(url.pathname, '/api/admin/users/');
         sendJson(res, 200, await repo.updateAdminUser(id, await readJson(req), adminUserId), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/admin/users/') && url.pathname.endsWith('/resend-verification') && req.method === 'POST') {
+        const id = extractId(url.pathname, '/api/admin/users/', '/resend-verification');
+        const result = await repo.getUserForEmailVerification(id, adminUserId);
+        if (!result?.user) {
+          sendJson(res, 404, { error: 'Cliente nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        if (result.user.emailVerified) {
+          sendJson(res, 200, { ok: true, email: { sent: false, reason: 'already_verified' } }, corsOrigin);
+          return true;
+        }
+
+        const token = await authRepo.createEmailVerificationToken(result.user.id);
+        if (!token) {
+          sendJson(res, 503, { error: 'Nao foi possivel gerar verificacao de email.' }, corsOrigin);
+          return true;
+        }
+        const publicUrl = appConfig.VELKOR_PUBLIC_URL || 'http://localhost:3000';
+        const email = await adminEmailService.sendEmailVerification({
+          to: result.user.email,
+          verificationUrl: `${publicUrl}/account/verify-email?token=${encodeURIComponent(token)}`,
+        });
+        sendJson(res, 200, { ok: true, email }, corsOrigin);
         return true;
       }
 
