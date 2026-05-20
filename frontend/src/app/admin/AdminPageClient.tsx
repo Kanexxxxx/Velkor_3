@@ -227,6 +227,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [customerRoleFilter, setCustomerRoleFilter] = useState<'all' | AdminRole>('all');
   const [customerEmailFilter, setCustomerEmailFilter] = useState<'all' | 'verified' | 'pending'>('all');
   const [customerPage, setCustomerPage] = useState(1);
+  const [auditLogSearch, setAuditLogSearch] = useState('');
+  const [auditLogPage, setAuditLogPage] = useState(1);
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -475,6 +477,28 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   useEffect(() => {
     setCustomerPage(1);
   }, [adminUsers.length, customerEmailFilter, customerRoleFilter, customerSearch]);
+
+  const auditLogPageSize = 12;
+  const filteredAuditLogs = useMemo(() => {
+    const query = auditLogSearch.trim().toLowerCase();
+    if (!query) return adminAuditLogs;
+    return adminAuditLogs.filter(log => [
+      log.action,
+      log.adminEmail,
+      log.adminUserId,
+      log.targetType,
+      log.targetId,
+    ].some(value => String(value || '').toLowerCase().includes(query)));
+  }, [adminAuditLogs, auditLogSearch]);
+  const auditLogPageCount = Math.max(1, Math.ceil(filteredAuditLogs.length / auditLogPageSize));
+  const visibleAuditLogs = filteredAuditLogs.slice(
+    (auditLogPage - 1) * auditLogPageSize,
+    auditLogPage * auditLogPageSize,
+  );
+
+  useEffect(() => {
+    setAuditLogPage(1);
+  }, [adminAuditLogs.length, auditLogSearch]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1553,8 +1577,18 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             <section className="info-block" hidden={activeSection !== 'logs'}>
               <h2>Logs e auditoria</h2>
               {adminAuditLogs.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de auditoria do admin">
+                  <input
+                    value={auditLogSearch}
+                    onChange={event => setAuditLogSearch(event.target.value)}
+                    placeholder="Buscar por acao, admin, alvo ou ID"
+                    aria-label="Buscar logs de auditoria"
+                  />
+                </div>
+                {visibleAuditLogs.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {adminAuditLogs.slice(0, 20).map(log => (
+                  {visibleAuditLogs.map(log => (
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={log.id}>
                       <div>
                         <h5>{log.action}</h5>
@@ -1566,6 +1600,34 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     </div>
                   ))}
                 </div>
+                ) : (
+                  <EmptyState
+                    title="Nenhum log encontrado"
+                    description="Ajuste a busca para revisar outros eventos administrativos."
+                  />
+                )}
+                {auditLogPageCount > 1 ? (
+                  <div className="account-pagination" aria-label="Paginacao de logs do admin">
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={auditLogPage <= 1}
+                      onClick={() => setAuditLogPage(page => Math.max(1, page - 1))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <span>Pagina {auditLogPage} de {auditLogPageCount}</span>
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={auditLogPage >= auditLogPageCount}
+                      onClick={() => setAuditLogPage(page => Math.min(auditLogPageCount, page + 1))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
