@@ -654,7 +654,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
                   <span className="order-code">#{order.id}</span>
                   <span className="order-date">{formatDate(order.createdAt)}</span>
                 </div>
-                <span className={`order-status status-${status.tone}`}>{status.label}</span>
+                <StatusBadge tone={toneToStatusTone(status.tone)}>{status.label}</StatusBadge>
                 <span className="order-total">{formatPrice(order.total)}</span>
               </summary>
               <div className="order-body">
@@ -671,12 +671,20 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
                 </div>
                 <dl className="order-grid">
                   <div><dt>Pagamento</dt><dd>{paymentLabel(payment)}</dd></div>
-                  <div><dt>Status do pagamento</dt><dd>{paymentStatusLabel(order.paymentStatus)}</dd></div>
+                  <div>
+                    <dt>Status do pagamento</dt>
+                    <dd>
+                      <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
+                        {paymentStatusLabel(order.paymentStatus)}
+                      </StatusBadge>
+                    </dd>
+                  </div>
                   <div><dt>Entrega</dt><dd>{shippingMethodLabel(shipping)}</dd></div>
                   <div><dt>Frete</dt><dd>{shippingCost ? formatPrice(shippingCost) : 'Grátis'}</dd></div>
                   <div><dt>Imposto estimado</dt><dd>{formatPrice(tax)}</dd></div>
                   {discount > 0 ? <div><dt>Desconto</dt><dd>-{formatPrice(discount)}</dd></div> : null}
                   {address ? <div><dt>Endereço</dt><dd>{address.street}, {address.city}/{address.region}</dd></div> : null}
+                  {order.trackingCode ? <div><dt>Rastreio</dt><dd>{order.trackingCode}</dd></div> : null}
                 </dl>
                 <div className="order-actions">
                   <Link className="btn btn-ghost" href={`/account/orders/${encodeURIComponent(order.id)}`}>
@@ -712,6 +720,14 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
       ) : null}
     </article>
   );
+}
+
+function toneToStatusTone(tone: string): 'success' | 'warning' | 'danger' | 'neutral' | 'info' {
+  if (tone === 'paid' || tone === 'delivered') return 'success';
+  if (tone === 'cancelled') return 'danger';
+  if (tone === 'shipped') return 'info';
+  if (tone === 'pending') return 'warning';
+  return 'neutral';
 }
 
 function paymentLabel(payment: string | undefined) {
