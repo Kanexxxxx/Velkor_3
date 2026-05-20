@@ -2197,6 +2197,7 @@ section { position: relative; }
   padding: 12px;
   margin-bottom: 8px;
   cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
 }
 .admin-nav-button strong {
   display: block;
@@ -2207,6 +2208,10 @@ section { position: relative; }
   display: block;
   font-size: 12px;
   color: var(--muted);
+}
+.admin-nav-button:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 .admin-nav-button.active {
   border-color: var(--red);
@@ -3394,6 +3399,10 @@ section { position: relative; }
   border-radius: 8px;
   background: var(--ink);
   padding: 14px;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.admin-pulse-grid > div:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 .admin-pulse-grid span,
 .admin-top-products span {
@@ -3572,6 +3581,7 @@ code {
   display: grid;
   gap: 8px;
   padding: 18px;
+  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
 }
 .op-stat-card span {
   color: var(--muted);
@@ -3588,6 +3598,11 @@ code {
 .op-stat-card.tone-success { border-color: rgba(57, 217, 138, 0.45); }
 .op-stat-card.tone-warning { border-color: rgba(255, 190, 92, 0.5); }
 .op-stat-card.tone-danger { border-color: rgba(255, 27, 68, 0.55); }
+.op-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
 .op-status {
   display: inline-flex;
   align-items: center;
@@ -3859,29 +3874,11 @@ code {
 }
 
 /* Operational component polish */
-.op-stat-card {
-  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
-}
-.op-stat-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-}
 .op-section-card {
   transition: border-color 0.2s var(--ease);
 }
-.admin-nav-button {
-  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
-}
-.admin-nav-button:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-.admin-pulse-grid > div {
-  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
-}
-.admin-pulse-grid > div:hover {
-  background: rgba(255, 255, 255, 0.03);
+.op-section-card:hover {
+  border-color: rgba(255, 255, 255, 0.08);
 }
 /* Admin error state */
 .admin-error-notice {
