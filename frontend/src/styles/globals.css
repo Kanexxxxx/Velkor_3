@@ -3938,3 +3938,21 @@ code {
 .admin-user-form { grid-template-columns: 1fr; gap: 16px; }
 .admin-btn-gap { margin-left: 10px; }
 .admin-section-count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+/* Admin products/forms */
+.admin-product-fields { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.admin-import-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.admin-import-meta { text-align: right; }
+.admin-search-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(160px, 220px); }
+.admin-form-gap { margin-bottom: 28px; }
+.admin-form-gap-sm { margin-bottom: 18px; }
+.admin-form-gap-xs { margin-bottom: 12px; }
+.admin-form-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.admin-product-checkbox { display: flex; gap: 10px; align-items: center; margin-top: 16px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; }
+.admin-upload-input { margin-top: 8px; }
+.admin-settings-item { grid-template-columns: 1fr; }
+.admin-summary-notice { font-family: var(--font-mono); font-size: 11px; margin-top: 12px; color: var(--text); }
+.admin-import-items { margin-top: 18px; }
+.admin-coupon-submit { margin-top: 18px; }
+.admin-import-label { margin-bottom: 10px; }
+.admin-import-desc { margin-bottom: 14px; }
