@@ -3021,6 +3021,16 @@ section { position: relative; }
   border-radius: 12px;
   overflow: hidden;
 }
+.order-card-overflow { overflow: visible; }
+.summary-items-flush { margin-bottom: 0 !important; padding-bottom: 0 !important; border-bottom: none !important; }
+.cep-loading {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: pulse 1.5s ease-in-out infinite;
+}
 .order-card[open] { border-color: var(--red); }
 .order-card summary {
   display: grid;

@@ -46,14 +46,14 @@ function shippingMethodLabel(shipping: string | undefined) {
   if (value.includes('sedex')) return 'SEDEX';
   if (value.includes('pac')) return 'PAC';
   if (value.includes('express')) return 'Expressa';
-  return 'Padrao';
+  return 'Padrão';
 }
 
 function buildOrderTimeline(order: Order): TimelineItem[] {
   if (order.status === 'cancelled') {
     return [
       { title: 'Pedido criado', description: formatDate(order.createdAt), state: 'complete' },
-      { title: 'Pedido cancelado', description: 'Este pedido nao segue para pagamento ou envio.', state: 'danger' },
+      { title: 'Pedido cancelado', description: 'Este pedido não segue para pagamento ou envio.', state: 'danger' },
     ];
   }
 
@@ -70,18 +70,18 @@ function buildOrderTimeline(order: Order): TimelineItem[] {
       state: paymentApproved ? 'complete' : 'current',
     },
     {
-      title: 'Em separacao',
+      title: 'Em separação',
       description: 'A equipe prepara os itens para envio.',
       state: preparing ? 'complete' : 'pending',
     },
     {
       title: 'Enviado',
-      description: shipped ? `Pedido saiu para transporte.${order.trackingCode ? ` Rastreio: ${order.trackingCode}.` : ''}` : 'O codigo de rastreio aparece aqui quando for enviado.',
+      description: shipped ? `Pedido saiu para transporte.${order.trackingCode ? ` Rastreio: ${order.trackingCode}.` : ''}` : 'O código de rastreio aparece aqui quando for enviado.',
       state: shipped ? 'complete' : 'pending',
     },
     {
       title: 'Entregue',
-      description: delivered ? 'Entrega concluida.' : 'Aguardando atualizacao final.',
+      description: delivered ? 'Entrega concluída.' : 'Aguardando atualização final.',
       state: delivered ? 'complete' : 'pending',
     },
   ];
@@ -117,11 +117,11 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
         if (isAccountApiUnavailable(caught)) {
           const localOrders = await loadOrdersForUser(user.id);
           setOrder(localOrders.find(item => item.id === orderId) ?? null);
-          setError(localOrders.some(item => item.id === orderId) ? '' : 'Pedido nao encontrado nesta conta.');
+          setError(localOrders.some(item => item.id === orderId) ? '' : 'Pedido não encontrado nesta conta.');
           return;
         }
         setOrder(null);
-        setError(caught instanceof Error ? caught.message : 'Nao foi possivel carregar este pedido.');
+        setError(caught instanceof Error ? caught.message : 'Não foi possível carregar este pedido.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -166,15 +166,15 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
       <main className="info-page account-dashboard">
         <div className="container">
           <div className="crumbs">
-            <Link href="/">Inicio</Link>
+            <Link href="/">Início</Link>
             <span className="sep">/</span>
             <Link href="/account/orders">Pedidos</Link>
             <span className="sep">/</span>
             <span>{orderId}</span>
           </div>
           <section className="empty-state">
-            <h2>Pedido nao encontrado.</h2>
-            <p>{error || 'Nao encontramos este pedido na sua conta.'}</p>
+            <h2>Pedido não encontrado.</h2>
+            <p>{error || 'Não encontramos este pedido na sua conta.'}</p>
             <div className="order-actions">
               <button type="button" className="btn btn-primary" onClick={() => setRefreshKey(key => key + 1)}>Tentar novamente</button>
               <Link className="btn btn-ghost" href="/account/orders">Voltar aos pedidos</Link>
@@ -195,7 +195,7 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
       const preference = await createPaymentPreference(order.id);
       window.location.href = preference.initPoint;
     } catch (caught) {
-      notify(caught instanceof Error ? caught.message : 'Nao foi possivel reabrir o pagamento.', 'error');
+      notify(caught instanceof Error ? caught.message : 'Não foi possível reabrir o pagamento.', 'error');
       setPaying(false);
     }
   }
@@ -205,9 +205,9 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
     try {
       setResendingEmail(true);
       await resendOrderConfirmation(order.id);
-      notify('Confirmacao do pedido reenviada para seu email.', 'success');
+      notify('Confirmação do pedido reenviada para seu email.', 'success');
     } catch (caught) {
-      notify(caught instanceof Error ? caught.message : 'Nao foi possivel reenviar a confirmacao.', 'error');
+      notify(caught instanceof Error ? caught.message : 'Não foi possível reenviar a confirmação.', 'error');
     } finally {
       setResendingEmail(false);
     }
@@ -231,7 +231,7 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
     <main className="info-page account-dashboard">
       <div className="container">
         <div className="crumbs">
-          <Link href="/">Inicio</Link>
+          <Link href="/">Início</Link>
           <span className="sep">/</span>
           <Link href="/account/orders">Pedidos</Link>
           <span className="sep">/</span>
@@ -289,7 +289,7 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
               <div className="order-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setRefreshKey(key => key + 1)}>Atualizar</button>
                 <button type="button" className="btn btn-ghost" disabled={resendingEmail} onClick={handleResendConfirmation}>
-                  {resendingEmail ? 'Reenviando...' : 'Reenviar confirmacao'}
+                  {resendingEmail ? 'Reenviando...' : 'Reenviar confirmação'}
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={handleBuyAgain}>
                   Comprar novamente
@@ -302,14 +302,14 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
               </div>
             </header>
 
-            <div className="order-card" style={{ overflow: 'visible' }}>
+            <div className="order-card order-card-overflow">
               <div className="order-card-summary">
                 <span className={`order-status status-${status.tone}`}>{status.label}</span>
                 <span className="order-code">Pagamento: {paymentStatusLabel(order.paymentStatus)}</span>
                 <span className="order-total">{formatPrice(order.total)}</span>
               </div>
               <div className="order-body">
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {order.items.map(item => {
                     const product = productsById[item.productId] ?? getProductById(item.productId);
                     const price = item.unitPrice ?? product?.price ?? 0;
@@ -329,14 +329,14 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
 
                 <dl className="order-grid">
                   <div><dt>Subtotal</dt><dd>{formatPrice(order.subtotal)}</dd></div>
-                  <div><dt>Frete</dt><dd>{order.shippingCost ? formatPrice(order.shippingCost) : 'Gratis'}</dd></div>
+                  <div><dt>Frete</dt><dd>{order.shippingCost ? formatPrice(order.shippingCost) : 'Grátis'}</dd></div>
                   <div><dt>Desconto</dt><dd>{order.discount ? `-${formatPrice(order.discount)}` : formatPrice(0)}</dd></div>
                   <div><dt>Total</dt><dd>{formatPrice(order.total)}</dd></div>
                   <div><dt>Quem recebe</dt><dd>{order.address.recipient || order.contact.name}</dd></div>
-                  <div><dt>Telefone</dt><dd>{order.contact.phone || order.address.phone || 'Nao informado'}</dd></div>
-                  <div><dt>Endereco</dt><dd>{order.address.street}, {order.address.city}/{order.address.region}</dd></div>
+                  <div><dt>Telefone</dt><dd>{order.contact.phone || order.address.phone || 'Não informado'}</dd></div>
+                  <div><dt>Endereço</dt><dd>{order.address.street}, {order.address.city}/{order.address.region}</dd></div>
                   <div><dt>CEP</dt><dd>{order.address.postalCode}</dd></div>
-                  <div><dt>Rastreio</dt><dd>{order.trackingCode || 'Ainda nao informado'}</dd></div>
+                  <div><dt>Rastreio</dt><dd>{order.trackingCode || 'Ainda não informado'}</dd></div>
                   <div><dt>Enviado em</dt><dd>{order.shippedAt ? formatDate(order.shippedAt) : 'Aguardando envio'}</dd></div>
                 </dl>
               </div>

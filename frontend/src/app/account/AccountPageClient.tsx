@@ -766,30 +766,53 @@ function AddressesPanel() {
   const [addressToRemove, setAddressToRemove] = useState<Address | null>(null);
   const [addressRemoving, setAddressRemoving] = useState(false);
 
+  type AddressFormState = {
+    label: string; recipient: string; street: string; complement: string;
+    city: string; region: string; postalCode: string; country: string;
+    phone: string; isDefault: boolean;
+  };
+  const makeEmptyForm = (): AddressFormState => ({
+    label: 'Casa', recipient: user?.name ?? '', street: '', complement: '',
+    city: '', region: '', postalCode: '', country: 'Brasil',
+    phone: user?.phone ?? '', isDefault: (user?.addresses.length ?? 0) === 0,
+  });
+  const [form, setForm] = useState<AddressFormState>(makeEmptyForm);
+  const [cepLoading, setCepLoading] = useState(false);
+
   if (!user) return null;
+
+  async function handleCepChange(value: string) {
+    const digits = value.replace(/\D/g, '');
+    setForm(s => ({ ...s, postalCode: value }));
+    if (digits.length !== 8) return;
+    try {
+      setCepLoading(true);
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setForm(s => ({
+          ...s,
+          street: data.logradouro || s.street,
+          city: data.localidade || s.city,
+          region: data.uf || s.region,
+        }));
+      }
+    } catch {
+      // silent fail — user fills manually
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const payload: Omit<Address, 'id'> & { id?: string } = {
-      id: editing?.id,
-      label: String(data.get('label') ?? 'Endereço'),
-      recipient: String(data.get('recipient') ?? ''),
-      street: String(data.get('street') ?? ''),
-      complement: String(data.get('complement') ?? ''),
-      city: String(data.get('city') ?? ''),
-      region: String(data.get('region') ?? ''),
-      postalCode: String(data.get('postalCode') ?? ''),
-      country: String(data.get('country') ?? 'Brasil'),
-      phone: String(data.get('phone') ?? ''),
-      isDefault: data.get('isDefault') === 'on'
-    };
-
+    const payload: Omit<Address, 'id'> & { id?: string } = { id: editing?.id, ...form };
     try {
       await upsertAddress(payload);
       notify(editing ? 'Endereço atualizado.' : 'Endereço salvo.', 'success');
       setEditing(null);
       setOpen(false);
+      setForm(makeEmptyForm());
     } catch (error) {
       notify((error as Error).message, 'error');
     }
@@ -805,7 +828,7 @@ function AddressesPanel() {
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() => { setEditing(null); setOpen(true); }}
+          onClick={() => { setEditing(null); setForm(makeEmptyForm()); setOpen(true); }}
         >
           Novo endereço
         </button>
@@ -832,7 +855,16 @@ function AddressesPanel() {
               <p>{address.city} / {address.region} · {address.postalCode}</p>
               <p>{address.country}{address.phone ? ` · ${address.phone}` : ''}</p>
               <div className="address-card-actions">
-                <button type="button" onClick={() => { setEditing(address); setOpen(true); }}>Editar</button>
+                <button type="button" onClick={() => {
+                  setEditing(address);
+                  setForm({
+                    label: address.label, recipient: address.recipient, street: address.street,
+                    complement: address.complement ?? '', city: address.city, region: address.region,
+                    postalCode: address.postalCode, country: address.country,
+                    phone: address.phone ?? '', isDefault: address.isDefault ?? false,
+                  });
+                  setOpen(true);
+                }}>Editar</button>
                 {!address.isDefault ? (
                   <button type="button" onClick={async () => { await makeAddressDefault(address.id); notify('Endereço padrão atualizado.', 'success'); }}>
                     Tornar padrão
@@ -851,26 +883,26 @@ function AddressesPanel() {
         <form className="form-block account-form" onSubmit={handleSubmit}>
           <h3>{editing ? 'Editar endereço' : 'Novo endereço'}</h3>
           <div className="field-row cols-2">
-            <div className="field"><label htmlFor="addr-label">Apelido</label><input id="addr-label" name="label" type="text" defaultValue={editing?.label ?? 'Casa'} required /></div>
-            <div className="field"><label htmlFor="addr-recipient">Quem recebe</label><input id="addr-recipient" name="recipient" type="text" defaultValue={editing?.recipient ?? user.name} required /></div>
+            <div className="field"><label htmlFor="addr-label">Apelido</label><input id="addr-label" name="label" type="text" value={form.label} required onChange={e => setForm(s => ({ ...s, label: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-recipient">Quem recebe</label><input id="addr-recipient" name="recipient" type="text" value={form.recipient} required onChange={e => setForm(s => ({ ...s, recipient: e.target.value }))} /></div>
           </div>
           <div className="field-row">
-            <div className="field"><label htmlFor="addr-street">Rua e número</label><input id="addr-street" name="street" type="text" defaultValue={editing?.street ?? ''} required /></div>
+            <div className="field"><label htmlFor="addr-street">Rua e número</label><input id="addr-street" name="street" type="text" value={form.street} required onChange={e => setForm(s => ({ ...s, street: e.target.value }))} /></div>
           </div>
           <div className="field-row">
-            <div className="field"><label htmlFor="addr-complement">Complemento</label><input id="addr-complement" name="complement" type="text" defaultValue={editing?.complement ?? ''} /></div>
+            <div className="field"><label htmlFor="addr-complement">Complemento</label><input id="addr-complement" name="complement" type="text" value={form.complement} onChange={e => setForm(s => ({ ...s, complement: e.target.value }))} /></div>
           </div>
           <div className="field-row cols-3">
-            <div className="field"><label htmlFor="addr-city">Cidade</label><input id="addr-city" name="city" type="text" defaultValue={editing?.city ?? ''} required /></div>
-            <div className="field"><label htmlFor="addr-region">Estado</label><input id="addr-region" name="region" type="text" defaultValue={editing?.region ?? ''} required /></div>
-            <div className="field"><label htmlFor="addr-postal">CEP</label><input id="addr-postal" name="postalCode" type="text" defaultValue={editing?.postalCode ?? ''} required /></div>
+            <div className="field"><label htmlFor="addr-city">Cidade</label><input id="addr-city" name="city" type="text" value={form.city} required onChange={e => setForm(s => ({ ...s, city: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-region">Estado</label><input id="addr-region" name="region" type="text" value={form.region} required onChange={e => setForm(s => ({ ...s, region: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-postal">CEP {cepLoading ? <span className="cep-loading">buscando...</span> : null}</label><input id="addr-postal" name="postalCode" type="text" value={form.postalCode} placeholder="00000-000" required onChange={e => handleCepChange(e.target.value)} /></div>
           </div>
           <div className="field-row cols-2">
-            <div className="field"><label htmlFor="addr-country">País</label><input id="addr-country" name="country" type="text" defaultValue={editing?.country ?? 'Brasil'} required /></div>
-            <div className="field"><label htmlFor="addr-phone">Telefone</label><input id="addr-phone" name="phone" type="tel" defaultValue={editing?.phone ?? user.phone ?? ''} /></div>
+            <div className="field"><label htmlFor="addr-country">País</label><input id="addr-country" name="country" type="text" value={form.country} required onChange={e => setForm(s => ({ ...s, country: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-phone">Telefone</label><input id="addr-phone" name="phone" type="tel" value={form.phone} onChange={e => setForm(s => ({ ...s, phone: e.target.value }))} /></div>
           </div>
           <label className="checkbox-row">
-            <input type="checkbox" name="isDefault" defaultChecked={editing?.isDefault ?? user.addresses.length === 0} />
+            <input type="checkbox" name="isDefault" checked={form.isDefault} onChange={e => setForm(s => ({ ...s, isDefault: e.target.checked }))} />
             <span>Definir como endereço padrão</span>
           </label>
           <div className="account-form-actions">
@@ -881,8 +913,8 @@ function AddressesPanel() {
       ) : null}
       <ConfirmDialog
         open={Boolean(addressToRemove)}
-        title="Remover endereco?"
-        description="Este endereco deixa de aparecer no checkout rapido, mas seus pedidos antigos continuam preservados."
+        title="Remover endereço?"
+        description="Este endereço deixa de aparecer no checkout rápido, mas seus pedidos antigos continuam preservados."
         confirmLabel="Remover"
         danger
         loading={addressRemoving}
@@ -892,7 +924,7 @@ function AddressesPanel() {
           try {
             setAddressRemoving(true);
             await removeAddress(addressToRemove.id);
-            notify('Endereco removido.', 'info');
+            notify('Endereço removido.', 'info');
             setAddressToRemove(null);
           } catch (error) {
             notify((error as Error).message, 'error');
