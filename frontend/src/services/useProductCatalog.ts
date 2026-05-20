@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Product } from '@/types/product';
-import { fallbackCatalog, fetchCatalog, fetchProduct, readCachedCatalog, writeCachedCatalog, type CatalogState } from '@/services/productApi';
+import { fallbackCatalog, fetchCatalog, fetchProduct, writeCachedCatalog, type CatalogState } from '@/services/productApi';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -13,10 +13,9 @@ export interface CatalogLoadState extends CatalogState {
 }
 
 function getInitialCatalogState() {
-  const cached = readCachedCatalog();
   return {
-    catalog: cached ?? { products: [], categories: fallbackCatalog.categories, source: 'api' as const },
-    status: cached ? 'ready' as LoadStatus : 'idle' as LoadStatus,
+    catalog: { products: [], categories: fallbackCatalog.categories, source: 'api' as const },
+    status: 'idle' as LoadStatus,
   };
 }
 

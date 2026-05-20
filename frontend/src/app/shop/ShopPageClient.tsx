@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { LoadingSkeleton } from '@/components/operational';
 import { ProductCard } from '@/components/product/ProductCard';
 import { categoryLabels, formatPrice } from '@/services/products';
 import { useProductCatalog } from '@/services/useProductCatalog';
@@ -134,6 +135,7 @@ export function ShopPageClient() {
 
     return sortProducts(filtered, sort);
   }, [maxPrice, productList, search, selectedBrands, selectedCategories, selectedColor, selectedSize, sort]);
+  const isInitialCatalogLoading = catalog.status === 'loading' && productList.length === 0;
 
   function toggleCategory(category: ProductCategory) {
     setSelectedCategories(current => {
@@ -320,7 +322,13 @@ export function ShopPageClient() {
               </label>
             </div>
 
-            {filteredProducts.length > 0 ? (
+            {isInitialCatalogLoading ? (
+              <div className="shop-grid">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <LoadingSkeleton lines={4} key={index} />
+                ))}
+              </div>
+            ) : filteredProducts.length > 0 ? (
               <div className="shop-grid">
                 {filteredProducts.map(product => (
                   <ProductCard product={product} key={product.id} />
