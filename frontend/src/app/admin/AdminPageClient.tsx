@@ -222,6 +222,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productImportSummary, setProductImportSummary] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [productPage, setProductPage] = useState(1);
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -428,6 +429,17 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       return matchesStatus && matchesQuery;
     });
   }, [adminProducts, productSearch, productStatusFilter]);
+
+  const productPageSize = 12;
+  const productPageCount = Math.max(1, Math.ceil(filteredAdminProducts.length / productPageSize));
+  const visibleAdminProducts = filteredAdminProducts.slice(
+    (productPage - 1) * productPageSize,
+    productPage * productPageSize,
+  );
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearch, productStatusFilter, adminProducts.length]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1276,13 +1288,23 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                 <p className="meta">{filteredAdminProducts.length} produto(s) filtrado(s) de {adminProducts.length} cadastrados.</p>
               </div>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {filteredAdminProducts.slice(0, 12).map(product => (
+                {visibleAdminProducts.map(product => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
-                    <div>
+                    <div className="admin-product-row">
+                      <span
+                        className="admin-product-thumb"
+                        style={{ backgroundImage: `url(${product.image})` }}
+                        aria-hidden="true"
+                      />
+                      <div>
                       <h5>{product.name}</h5>
                       <div className="meta">{product.brand} · {product.category}</div>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <StatusBadge tone={product.active ? 'success' : 'neutral'}>
+                        {product.active ? 'Ativo' : 'Inativo'}
+                      </StatusBadge>
                       <div className="price">{formatPrice(product.price)}</div>
                       <button
                         type="button"
@@ -1307,12 +1329,33 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </div>
                 ))}
                 {filteredAdminProducts.length === 0 ? (
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                    <h5>Nenhum produto encontrado</h5>
-                    <div className="meta">Ajuste busca ou filtro para localizar outro item.</div>
-                  </div>
+                  <EmptyState
+                    title="Nenhum produto encontrado"
+                    description="Ajuste busca ou filtro para localizar outro item."
+                  />
                 ) : null}
               </div>
+              {productPageCount > 1 ? (
+                <div className="account-pagination" aria-label="Paginacao de produtos do admin">
+                  <ActionButton
+                    type="button"
+                    tone="secondary"
+                    disabled={productPage <= 1}
+                    onClick={() => setProductPage(page => Math.max(1, page - 1))}
+                  >
+                    Anterior
+                  </ActionButton>
+                  <span>Pagina {productPage} de {productPageCount}</span>
+                  <ActionButton
+                    type="button"
+                    tone="secondary"
+                    disabled={productPage >= productPageCount}
+                    onClick={() => setProductPage(page => Math.min(productPageCount, page + 1))}
+                  >
+                    Proxima
+                  </ActionButton>
+                </div>
+              ) : null}
             </section>
 
             <section className="info-block" hidden={!['overview', 'settings'].includes(activeSection)}>
