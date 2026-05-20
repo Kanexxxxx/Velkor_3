@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
-import { ConfirmDialog, EmptyState, SectionCard, StatusBadge } from '@/components/operational';
+import { ConfirmDialog, EmptyState, LoadingSkeleton, SectionCard, StatusBadge } from '@/components/operational';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
@@ -387,9 +387,25 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
               </StatusBadge>
             </div>
             <div>
-              <span>Pedidos</span>
-              <strong>{ordersLoading ? '...' : orders.length}</strong>
-              <Link href="/account/orders" scroll={false}>Ver historico</Link>
+              <span>Último pedido</span>
+              {orders.length > 0 ? (
+                <>
+                  <strong>#{orders[0].id.slice(0, 8)}</strong>
+                  <StatusBadge tone={
+                    orderStatusLabels[orders[0].status]?.tone === 'cancelled' ? 'danger' :
+                    orderStatusLabels[orders[0].status]?.tone === 'pending' ? 'warning' :
+                    'success'
+                  }>
+                    {orderStatusLabels[orders[0].status]?.label ?? orders[0].status}
+                  </StatusBadge>
+                  <Link href={`/account/orders/${encodeURIComponent(orders[0].id)}`} scroll={false}>Ver detalhes</Link>
+                </>
+              ) : (
+                <>
+                  <strong>—</strong>
+                  <Link href="/shop">Explorar loja</Link>
+                </>
+              )}
             </div>
             <div>
               <span>Favoritos</span>
@@ -548,9 +564,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           <h2>Meus pedidos</h2>
           <p>Histórico completo, status atual e detalhes de cada compra.</p>
         </header>
-        <div className="empty-state" style={{ opacity: 0.6 }}>
-          <p>Carregando pedidos...</p>
-        </div>
+        <LoadingSkeleton lines={4} />
       </article>
     );
   }
@@ -599,7 +613,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           <input
             type="search"
             value={query}
-            placeholder="Codigo ou ID do pedido"
+            placeholder="Código ou ID do pedido"
             onChange={event => setQuery(event.target.value)}
           />
         </label>
@@ -611,7 +625,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
             <option value="paid">Pago</option>
             <option value="approved">Pagamento aprovado</option>
             <option value="shipped">Enviado</option>
-            <option value="fulfilled">Concluido</option>
+            <option value="fulfilled">Concluído</option>
             <option value="cancelled">Cancelado</option>
             <option value="rejected">Pagamento recusado</option>
           </select>
@@ -690,9 +704,9 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           <button type="button" className="btn btn-ghost" disabled={safePage <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>
             Anterior
           </button>
-          <span>Pagina {safePage} de {pageCount}</span>
+          <span>Página {safePage} de {pageCount}</span>
           <button type="button" className="btn btn-ghost" disabled={safePage >= pageCount} onClick={() => setPage(value => Math.min(pageCount, value + 1))}>
-            Proxima
+            Próxima
           </button>
         </div>
       ) : null}
