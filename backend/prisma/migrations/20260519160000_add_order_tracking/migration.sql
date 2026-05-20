@@ -1,0 +1,2 @@
+ALTER TABLE "Order" ADD COLUMN "trackingCode" TEXT;
+ALTER TABLE "Order" ADD COLUMN "shippedAt" TIMESTAMP(3);

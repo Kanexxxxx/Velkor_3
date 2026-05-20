@@ -57,10 +57,11 @@ function orderPaymentApprovedTemplate({ order }) {
 }
 
 function orderShippedTemplate({ order }) {
+  const tracking = order.trackingCode ? `<p style="margin:16px 0 0;color:#aaa">Codigo de rastreio</p><p style="margin:0;font-size:20px;font-weight:bold">${order.trackingCode}</p>` : '';
   return {
     subject: `VELKOR - pedido ${order.id} enviado`,
-    text: `Seu pedido ${order.id} foi enviado. Em breve voce recebe ou acompanha as atualizacoes de entrega pelos canais da VELKOR.`,
-    html: baseHtml('Pedido enviado', `<p>Seu pedido <strong>${order.id}</strong> saiu para a etapa de envio.</p><p>Guarde este codigo para acompanhamento e suporte. Assim que houver novas atualizacoes logisticas, elas ficam vinculadas ao mesmo pedido.</p>`),
+    text: `Seu pedido ${order.id} foi enviado.${order.trackingCode ? ` Codigo de rastreio: ${order.trackingCode}.` : ''} Acompanhe as atualizacoes pelos canais da VELKOR.`,
+    html: baseHtml('Pedido enviado', `<p>Seu pedido <strong>${order.id}</strong> saiu para a etapa de envio.</p><div style="margin:20px 0;padding:18px;border:1px solid #333;border-radius:14px;background:#0b0b0b"><p style="margin:0 0 8px;color:#aaa">Codigo do pedido</p><p style="margin:0;font-size:22px;font-weight:bold">${order.id}</p>${tracking}</div><p>Guarde este codigo para acompanhamento e suporte. Assim que houver novas atualizacoes logisticas, elas ficam vinculadas ao mesmo pedido.</p>`),
   };
 }
 

@@ -76,7 +76,7 @@ function buildOrderTimeline(order: Order): TimelineItem[] {
     },
     {
       title: 'Enviado',
-      description: shipped ? 'Pedido saiu para transporte.' : 'O codigo de rastreio aparece aqui quando for enviado.',
+      description: shipped ? `Pedido saiu para transporte.${order.trackingCode ? ` Rastreio: ${order.trackingCode}.` : ''}` : 'O codigo de rastreio aparece aqui quando for enviado.',
       state: shipped ? 'complete' : 'pending',
     },
     {
@@ -336,6 +336,8 @@ export function OrderDetailPageClient({ orderId }: OrderDetailPageClientProps) {
                   <div><dt>Telefone</dt><dd>{order.contact.phone || order.address.phone || 'Nao informado'}</dd></div>
                   <div><dt>Endereco</dt><dd>{order.address.street}, {order.address.city}/{order.address.region}</dd></div>
                   <div><dt>CEP</dt><dd>{order.address.postalCode}</dd></div>
+                  <div><dt>Rastreio</dt><dd>{order.trackingCode || 'Ainda nao informado'}</dd></div>
+                  <div><dt>Enviado em</dt><dd>{order.shippedAt ? formatDate(order.shippedAt) : 'Aguardando envio'}</dd></div>
                 </dl>
               </div>
             </div>

@@ -391,9 +391,23 @@ function toApiOrder(order) {
     shippingCost: order.shippingCents / 100,
     coupon: order.couponCode || undefined,
     payment: order.paymentMethod || 'card',
+    paymentStatus: order.paymentStatus ? String(order.paymentStatus).toLowerCase() : undefined,
+    paymentProvider: order.paymentProvider || undefined,
+    paymentPreferenceId: order.paymentPreferenceId || undefined,
+    paidAt: order.paidAt instanceof Date ? order.paidAt.toISOString() : order.paidAt || undefined,
     shipping: order.shippingMethod || 'standard',
+    trackingCode: order.trackingCode || undefined,
+    shippedAt: order.shippedAt instanceof Date ? order.shippedAt.toISOString() : order.shippedAt || undefined,
+    contact: {
+      name: order.contactName || '',
+      email: order.email,
+      phone: order.contactPhone || '',
+    },
+    address: order.shippingAddress ? toAdminAddress(order.shippingAddress) : {},
     items: (order.items || []).map(item => ({
       productId: item.productId,
+      name: item.name || item.productId,
+      unitPrice: Number(item.unitPriceCents || 0) / 100,
       quantity: item.quantity,
       size: item.size || '',
       color: item.color || '',
@@ -460,6 +474,32 @@ async function updateOrderStatus(id, status, adminUserId) {
       include: { items: true, shippingAddress: true },
     });
     await logAdminAction(tx, { adminUserId, action: 'order.status.update', targetType: 'order', targetId: id, metadata: { status } });
+    return updated;
+  });
+  return { order: toApiOrder(order), storage: 'database' };
+}
+
+async function updateOrderShipping(id, payload, adminUserId) {
+  const prisma = getPrisma();
+  if (!prisma) return { order: null, storage: 'demo' };
+  const trackingCode = normalizeText(payload?.trackingCode, 80);
+  if (!trackingCode) {
+    const error = new Error('Codigo de rastreio invalido.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const order = await prisma.$transaction(async tx => {
+    const updated = await tx.order.update({
+      where: { id },
+      data: {
+        status: 'FULFILLED',
+        trackingCode,
+        shippedAt: new Date(),
+      },
+      include: { items: true, shippingAddress: true },
+    });
+    await logAdminAction(tx, { adminUserId, action: 'order.shipping.update', targetType: 'order', targetId: id, metadata: { trackingCode } });
     return updated;
   });
   return { order: toApiOrder(order), storage: 'database' };
@@ -714,6 +754,7 @@ module.exports = {
   updateAdminUser,
   updateCoupon,
   updateNewsletterSubscriber,
+  updateOrderShipping,
   updateOrderStatus,
   updateProduct,
   validateAdminUserPatch,

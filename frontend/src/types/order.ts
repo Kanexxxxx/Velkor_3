@@ -22,6 +22,8 @@ export interface Order {
   paymentProvider?: string;
   paymentPreferenceId?: string;
   paidAt?: string;
+  trackingCode?: string;
+  shippedAt?: string;
   subtotal: number;
   shippingCost: number;
   tax: number;

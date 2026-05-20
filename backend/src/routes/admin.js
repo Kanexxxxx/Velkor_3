@@ -218,6 +218,15 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/shipping') && req.method === 'PATCH') {
+        const id = extractId(url.pathname, '/api/admin/orders/', '/shipping');
+        const result = await repo.updateOrderShipping(id, await readJson(req), adminUserId);
+        const email = await sendOrderShippedIfNeeded({ orderResult: result, emailService: adminEmailService });
+        if (email) result.email = email;
+        sendJson(res, 200, result, corsOrigin);
+        return true;
+      }
+
       if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/resend-confirmation') && req.method === 'POST') {
         const id = extractId(url.pathname, '/api/admin/orders/', '/resend-confirmation');
         const result = await repo.getOrderForNotification(id, adminUserId);

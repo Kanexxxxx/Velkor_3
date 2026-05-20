@@ -257,6 +257,17 @@ export async function updateAdminOrderStatus(id: string, status: Order['status']
   return data.order;
 }
 
+export async function updateAdminOrderShipping(id: string, trackingCode: string) {
+  const data = await request<{ order: Order; email?: { sent?: boolean; mode?: string } }>(
+    `/api/admin/orders/${encodeURIComponent(id)}/shipping`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ trackingCode }),
+    },
+  );
+  return data;
+}
+
 export async function resendAdminOrderConfirmation(id: string) {
   return request<{ ok: boolean; email?: { sent?: boolean; mode?: string } }>(
     `/api/admin/orders/${encodeURIComponent(id)}/resend-confirmation`,

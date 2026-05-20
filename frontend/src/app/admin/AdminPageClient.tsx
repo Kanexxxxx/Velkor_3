@@ -24,6 +24,7 @@ import {
   resendAdminOrderConfirmation,
   resendAdminUserVerification,
   updateAdminCoupon,
+  updateAdminOrderShipping,
   updateAdminOrderStatus,
   updateAdminProduct,
   updateAdminUser,
@@ -243,6 +244,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [newsletterSavingId, setNewsletterSavingId] = useState<string | null>(null);
   const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
   const [orderEmailSendingId, setOrderEmailSendingId] = useState<string | null>(null);
+  const [orderShippingSavingId, setOrderShippingSavingId] = useState<string | null>(null);
+  const [orderTrackingDrafts, setOrderTrackingDrafts] = useState<Record<string, string>>({});
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
   const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState<'all' | Order['status']>('all');
   const [adminOrderPage, setAdminOrderPage] = useState(1);
@@ -682,6 +685,27 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     }
   }
 
+  async function handleOrderShippingUpdate(order: Order) {
+    const trackingCode = (orderTrackingDrafts[order.id] ?? order.trackingCode ?? '').trim();
+    if (!trackingCode) {
+      setError('Informe o codigo de rastreio antes de marcar como enviado.');
+      return;
+    }
+    setOrderShippingSavingId(order.id);
+    setError('');
+    try {
+      const result = await updateAdminOrderShipping(order.id, trackingCode);
+      setOrders(current => current.map(item => item.id === result.order.id ? result.order : item));
+      setError(result.email?.sent === false
+        ? 'Pedido marcado como enviado, mas o email de envio falhou.'
+        : 'Pedido marcado como enviado e email de rastreio disparado.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar o envio.');
+    } finally {
+      setOrderShippingSavingId(null);
+    }
+  }
+
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>, user: AdminUser) {
     event.preventDefault();
     const form = userForms[user.id];
@@ -1025,6 +1049,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           <span>{order.address?.city || 'cidade n/a'}{order.address?.region ? `/${order.address.region}` : ''}</span>
                           <span>Subtotal {formatPrice(order.subtotal)}</span>
                           {order.discount > 0 ? <span>Desconto {formatPrice(order.discount)}</span> : null}
+                          {order.trackingCode ? <span>Rastreio {order.trackingCode}</span> : null}
                         </div>
                         <div className="meta">{order.status.toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
                       </div>
@@ -1050,6 +1075,21 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           disabled={orderEmailSendingId === order.id || apiMode !== 'real'}
                         >
                           {orderEmailSendingId === order.id ? 'Enviando...' : 'Reenviar email'}
+                        </button>
+                        <input
+                          value={orderTrackingDrafts[order.id] ?? order.trackingCode ?? ''}
+                          onChange={event => setOrderTrackingDrafts(current => ({ ...current, [order.id]: event.target.value }))}
+                          placeholder="Codigo de rastreio"
+                          aria-label={`Codigo de rastreio do pedido ${order.id}`}
+                          style={{ maxWidth: 180 }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => handleOrderShippingUpdate(order)}
+                          disabled={orderShippingSavingId === order.id || apiMode !== 'real'}
+                        >
+                          {orderShippingSavingId === order.id ? 'Salvando...' : 'Marcar enviado'}
                         </button>
                         <div className="price">{formatPrice(order.total)}</div>
                       </div>
