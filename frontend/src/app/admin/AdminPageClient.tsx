@@ -223,6 +223,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [productPage, setProductPage] = useState(1);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerRoleFilter, setCustomerRoleFilter] = useState<'all' | AdminRole>('all');
+  const [customerEmailFilter, setCustomerEmailFilter] = useState<'all' | 'verified' | 'pending'>('all');
+  const [customerPage, setCustomerPage] = useState(1);
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -440,6 +444,37 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   useEffect(() => {
     setProductPage(1);
   }, [productSearch, productStatusFilter, adminProducts.length]);
+
+  const customerPageSize = 6;
+  const filteredAdminUsers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    return adminUsers.filter(user => {
+      const matchesRole = customerRoleFilter === 'all' || user.role === customerRoleFilter;
+      const matchesEmail = customerEmailFilter === 'all'
+        || (customerEmailFilter === 'verified' && user.emailVerified)
+        || (customerEmailFilter === 'pending' && !user.emailVerified);
+      const addressText = user.addresses.map(address => `${address.recipient} ${address.street} ${address.city} ${address.postalCode}`).join(' ');
+      const orderText = user.orders.map(order => `${order.id} ${order.status}`).join(' ');
+      const matchesQuery = !query || [
+        user.name,
+        user.email,
+        user.role,
+        addressText,
+        orderText,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesRole && matchesEmail && matchesQuery;
+    });
+  }, [adminUsers, customerEmailFilter, customerRoleFilter, customerSearch]);
+
+  const customerPageCount = Math.max(1, Math.ceil(filteredAdminUsers.length / customerPageSize));
+  const visibleAdminUsers = filteredAdminUsers.slice(
+    (customerPage - 1) * customerPageSize,
+    customerPage * customerPageSize,
+  );
+
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [adminUsers.length, customerEmailFilter, customerRoleFilter, customerSearch]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -940,14 +975,50 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               <h2>Clientes</h2>
               {userError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 16 }}>{userError}</p> : null}
               {adminUsers.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de clientes do admin">
+                  <input
+                    value={customerSearch}
+                    onChange={event => setCustomerSearch(event.target.value)}
+                    placeholder="Buscar por nome, email, endereco ou pedido"
+                    aria-label="Buscar clientes"
+                  />
+                  <select
+                    value={customerRoleFilter}
+                    onChange={event => setCustomerRoleFilter(event.target.value as 'all' | AdminRole)}
+                    aria-label="Filtrar role dos clientes"
+                  >
+                    <option value="all">Todos os perfis</option>
+                    <option value="CUSTOMER">Clientes</option>
+                    <option value="ADMIN">Admins</option>
+                  </select>
+                  <select
+                    value={customerEmailFilter}
+                    onChange={event => setCustomerEmailFilter(event.target.value as 'all' | 'verified' | 'pending')}
+                    aria-label="Filtrar verificacao de email"
+                  >
+                    <option value="all">Todos emails</option>
+                    <option value="verified">Verificados</option>
+                    <option value="pending">Pendentes</option>
+                  </select>
+                </div>
+                {visibleAdminUsers.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {adminUsers.slice(0, 8).map(user => {
+                  {visibleAdminUsers.map(user => {
                     const form = userForms[user.id] ?? { name: user.name ?? '', email: user.email, role: user.role, emailVerified: user.emailVerified };
                     return (
                       <form className="summary-item" style={{ gridTemplateColumns: '1fr', gap: 16 }} key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
                         <div>
                           <h5>{user.email}</h5>
-                          <div className="meta">{user.role} - {user.emailVerified ? 'email verificado' : 'email pendente'} - {user.orders.length} pedidos</div>
+                          <div className="meta">
+                            {user.name || 'Cliente sem nome'} - {user.orders.length} pedidos - {user.addresses.length} enderecos
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                            <StatusBadge tone={user.role === 'ADMIN' ? 'warning' : 'neutral'}>{user.role}</StatusBadge>
+                            <StatusBadge tone={user.emailVerified ? 'success' : 'warning'}>
+                              {user.emailVerified ? 'Email verificado' : 'Email pendente'}
+                            </StatusBadge>
+                          </div>
                         </div>
                         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
                           <div className="field">
@@ -1013,6 +1084,34 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     );
                   })}
                 </div>
+                ) : (
+                  <EmptyState
+                    title="Nenhum cliente encontrado"
+                    description="Ajuste a busca, o perfil ou o status de email para encontrar outros clientes."
+                  />
+                )}
+                {customerPageCount > 1 ? (
+                  <div className="account-pagination" aria-label="Paginacao de clientes do admin">
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={customerPage <= 1}
+                      onClick={() => setCustomerPage(page => Math.max(1, page - 1))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <span>Pagina {customerPage} de {customerPageCount}</span>
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={customerPage >= customerPageCount}
+                      onClick={() => setCustomerPage(page => Math.min(customerPageCount, page + 1))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <p>{apiMode === 'real' ? 'Nenhum cliente cadastrado ainda.' : 'Clientes reais aparecem aqui quando o admin estiver conectado ao PostgreSQL.'}</p>
               )}
