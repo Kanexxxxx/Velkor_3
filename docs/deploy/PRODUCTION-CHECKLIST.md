@@ -1,112 +1,101 @@
-# VOLKERR Production Checklist
+# Production Deploy Checklist — VELKOR / VOLKERR
 
-Use este checklist antes de abrir trafego real.
+Use this checklist before and after every production deploy. Complete each step in order. Sign off at the bottom.
 
-## Codigo e segredos
+---
 
-- [ ] Branch correta: `chore/project-cleanup-production-ready`.
-- [ ] `git status --short` limpo antes do deploy.
-- [ ] Nenhum `.env`, senha, token Gmail ou token Mercado Pago commitado.
-- [ ] Commit atual registrado com `git rev-parse HEAD`.
-- [ ] Backup PostgreSQL criado antes de migrations.
+## 1. Pre-deploy
 
-## Backend env
+- [ ] **PostgreSQL backup** — dump the production database before any changes:
+  ```bash
+  pg_dump $DATABASE_URL > /var/backups/velkor_$(date +%Y%m%d_%H%M%S).sql
+  ```
+- [ ] **Pull latest branch** — confirm you are on the correct branch and it is up to date with the remote.
+- [ ] **npm install** — verify dependencies install cleanly with no peer-dependency errors.
+- [ ] **Build check** — `npm run build --prefix frontend` must complete without errors.
+- [ ] **Test check** — `npm test --prefix backend` and `npm run typecheck --prefix frontend` must both pass.
+- [ ] Notify the team that a deploy is in progress.
 
-- [ ] `NODE_ENV=production`.
-- [ ] `PORT=3001`.
-- [ ] `DATABASE_URL` aponta para PostgreSQL real.
-- [ ] `SESSION_SECRET` gerado com 64 bytes aleatorios.
-- [ ] `ALLOWED_ORIGINS=https://volkerr.com.br,https://www.volkerr.com.br`.
-- [ ] `VELKOR_PUBLIC_URL=https://volkerr.com.br`.
-- [ ] `ADMIN_EMAIL` configurado para o primeiro admin.
-- [ ] `ADMIN_PASSWORD` temporaria forte configurada apenas para seed inicial.
-- [ ] `LEGACY_ADMIN_UNLOCK_ENABLED=false`.
-- [ ] `EMAIL_DEV_MODE=false`.
-- [ ] `GMAIL_HOST`, `GMAIL_PORT`, `GMAIL_USER`, `GMAIL_PASS`, `EMAIL_FROM` configurados.
-- [ ] `MERCADO_PAGO_DEV_MODE=false`.
-- [ ] `MERCADO_PAGO_ACCESS_TOKEN` configurado.
-- [ ] `MERCADO_PAGO_WEBHOOK_SECRET` configurado.
+---
 
-## Frontend env
+## 2. VPS Deploy Sequence
 
-- [ ] `NEXT_PUBLIC_API_URL=https://volkerr.com.br`.
-- [ ] `NEXT_PUBLIC_BRAND_SITE_URL=https://volkerr.com.br`.
-- [ ] `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY` configurado.
-- [ ] Analytics configurado somente se a conta real ja estiver pronta.
-- [ ] Nenhum segredo sem prefixo `NEXT_PUBLIC_` no frontend.
+SSH into the VPS and run the following commands in order. Do not skip steps.
 
-## Banco
+```bash
+cd /var/www/volkerr
+git pull origin chore/project-cleanup-production-ready
+npm install --prefix backend
+npm install --prefix frontend
+npm run db:generate --prefix backend
+npm run db:deploy --prefix backend
+npm run build --prefix frontend
+pm2 restart velkor-backend --update-env
+pm2 restart velkor-frontend --update-env
+pm2 save
+```
 
-- [ ] PostgreSQL esta acessivel pela VPS.
-- [ ] `npm run db:deploy --prefix backend` executado.
-- [ ] `npm run db:seed --prefix backend` executado.
-- [ ] Primeiro usuario admin consegue fazer login real.
-- [ ] `emailVerified` e roles estao coerentes para o admin.
+Confirm that `pm2 status` shows both processes as **online** before proceeding.
 
-## Build e processos
+---
 
-- [ ] `npm ci --prefix backend` executado.
-- [ ] `npm ci --prefix frontend` executado.
-- [ ] `npm run build --prefix frontend` executado.
-- [ ] `pm2 start ecosystem.config.cjs --env production` executado.
-- [ ] `pm2 save` executado.
-- [ ] `pm2 startup` configurado.
-- [ ] `pm2 status` mostra `velkor-backend` e `velkor-frontend` online.
+## 3. Smoke Checks
 
-## nginx, SSL e seguranca
+Run these curl commands from the VPS or your local machine:
 
-- [ ] `/etc/nginx/sites-available/velkor` baseado em `docs/deploy/nginx/velkor.conf.example`.
-- [ ] `nginx -t` sem erros.
-- [ ] Certbot emitiu certificado valido.
-- [ ] `certbot renew --dry-run` sem erros.
-- [ ] HTTP redireciona para HTTPS.
-- [ ] Apenas portas `22`, `80` e `443` abertas no firewall.
-- [ ] Headers de seguranca presentes.
-- [ ] Cookies de sessao funcionam em HTTPS.
+```bash
+# Home page — should return HTTP 200
+curl -s -o /dev/null -w "%{http_code}" https://velkor.com.br/
 
-## Smoke tecnico
+# Products API — should return JSON
+curl -s https://velkor.com.br/api/products | head -c 200
 
-- [ ] `curl -i https://volkerr.com.br/api/health` retorna sucesso.
-- [ ] `curl -I https://volkerr.com.br` retorna sucesso.
-- [ ] `curl -I https://volkerr.com.br/robots.txt` retorna sucesso.
-- [ ] `curl -I https://volkerr.com.br/sitemap.xml` retorna sucesso.
-- [ ] `SMOKE_BASE_URL=https://volkerr.com.br npm run smoke --prefix frontend` passa.
+# Admin page — should return 200 (auth gate)
+curl -s -o /dev/null -w "%{http_code}" https://velkor.com.br/admin
 
-## Fluxos manuais
+# Account page — should return 200
+curl -s -o /dev/null -w "%{http_code}" https://velkor.com.br/account
 
-- [ ] Cadastro.
-- [ ] Login/logout.
-- [ ] Reset de senha por email.
-- [ ] Verificacao de email.
-- [ ] Carrinho persistente.
-- [ ] Favoritos persistentes.
-- [ ] Checkout com pedido persistido.
-- [ ] Confirmacao de pedido por email.
-- [ ] Mercado Pago sandbox cria preference e redireciona.
-- [ ] Webhook Mercado Pago atualiza pagamento/pedido.
-- [ ] Admin real acessa painel.
-- [ ] Usuario comum nao acessa rotas admin.
-- [ ] Admin altera status de pedido.
-- [ ] Admin gerencia usuarios.
-- [ ] Admin gerencia cupons.
-- [ ] Admin gerencia newsletter sem envio em massa.
-- [ ] Newsletter opt-in.
-- [ ] Unsubscribe.
+# Checkout page — should return 200
+curl -s -o /dev/null -w "%{http_code}" https://velkor.com.br/checkout
+```
 
-## Qualidade final
+All endpoints must return `200`. Any `5xx` is a blocker — trigger rollback immediately.
 
-- [ ] `npm test` passa.
-- [ ] `npm run build` passa.
-- [ ] `npm run e2e --prefix frontend` passa em desktop e mobile.
-- [ ] `npm audit --prefix backend --audit-level=moderate` sem vulnerabilidades moderadas/altas.
-- [ ] `npm audit --prefix frontend --audit-level=moderate` sem vulnerabilidades moderadas/altas.
-- [ ] `cd backend && npx prisma validate --schema prisma/schema.prisma` passa.
-- [ ] Smoke real em producao executado depois do deploy.
+---
 
-## Rollback
+## 4. Critical Checks
 
-- [ ] Commit anterior registrado.
-- [ ] Backup de banco disponivel.
-- [ ] `docs/deploy/ROLLBACK.md` lido antes do deploy.
-- [ ] Responsavel sabe como desligar webhook Mercado Pago temporariamente.
-- [ ] Responsavel sabe como reativar `LEGACY_ADMIN_UNLOCK_ENABLED=true` apenas em emergencia.
+### Mercado Pago Webhook URL
+
+- Log in to the [Mercado Pago Developer Dashboard](https://www.mercadopago.com.br/developers).
+- Confirm the webhook notification URL is set to:
+  ```
+  https://velkor.com.br/api/payments/webhook
+  ```
+- Send a test notification and confirm the backend logs show a `200` response.
+
+### Gmail SMTP Test
+
+- Trigger a test email (place a dummy order or use the admin "Reenviar confirmacao" button).
+- Confirm the email arrives within 2 minutes.
+- If it does not arrive, check `pm2 logs velkor-backend` for SMTP errors.
+
+### Melhor Envio Quote Test
+
+- Open the checkout page and enter a Brazilian CEP.
+- Confirm at least one shipping option appears within 10 seconds.
+- If no quotes appear, check `pm2 logs velkor-backend` for Melhor Envio API errors.
+
+---
+
+## 5. Sign-off
+
+| Field  | Value          |
+|--------|----------------|
+| Run by |                |
+| Date   |                |
+| Result | PASS / FAIL    |
+| Notes  |                |
+
+If any step fails, do not mark this deploy as complete. Trigger the rollback procedure documented in `rollback.md`.
