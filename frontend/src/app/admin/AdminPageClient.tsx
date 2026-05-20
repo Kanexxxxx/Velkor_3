@@ -977,9 +977,23 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={order.id}>
                       <div>
                         <h5>{order.id}</h5>
+                        <div className="admin-order-context">
+                          <span>{order.contact?.name || 'Cliente sem nome'}</span>
+                          <span>{order.contact?.email || 'email nao informado'}</span>
+                          <span>{order.items.length} item(ns)</span>
+                          <span>{order.shipping || 'frete nao informado'} - {formatPrice(order.shippingCost)}</span>
+                        </div>
+                        <div className="admin-order-context">
+                          <span>{order.address?.city || 'cidade n/a'}{order.address?.region ? `/${order.address.region}` : ''}</span>
+                          <span>Subtotal {formatPrice(order.subtotal)}</span>
+                          {order.discount > 0 ? <span>Desconto {formatPrice(order.discount)}</span> : null}
+                        </div>
                         <div className="meta">{order.status.toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
+                          Pagamento {order.paymentStatus || 'pending'}
+                        </StatusBadge>
                         <select
                           value={order.status}
                           onChange={event => handleOrderStatusChange(order, event.target.value as Order['status'])}
