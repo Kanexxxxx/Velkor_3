@@ -3857,3 +3857,63 @@ code {
   }
   .op-action { width: 100%; }
 }
+
+/* Operational component polish */
+.op-stat-card {
+  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.op-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.op-section-card {
+  transition: border-color 0.2s var(--ease);
+}
+.admin-nav-button {
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.admin-nav-button:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.admin-pulse-grid > div {
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.admin-pulse-grid > div:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+/* Admin error state */
+.admin-error-notice {
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 8px 0;
+}
+/* Admin order actions row */
+.admin-order-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* Account email verification warning */
+.account-verify-notice {
+  margin-bottom: 24px;
+}
+/* Admin stat grid section wrapper */
+.admin-stats-section {
+  margin-bottom: 32px;
+}
+/* Admin info content error */
+.admin-content-error {
+  margin-bottom: 24px;
+}
+/* Admin legacy actions */
+.admin-legacy-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}

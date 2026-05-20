@@ -330,7 +330,7 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
         </header>
 
         {user.emailVerified === false ? (
-          <section className="info-block" style={{ marginBottom: 24 }}>
+          <section className="info-block account-verify-notice">
             <h2>Confirme seu email</h2>
             <p>Os avisos de pedido, envio e recuperacao de senha chegam em {user.email}.</p>
             <button

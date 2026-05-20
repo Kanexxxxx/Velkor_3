@@ -74,16 +74,16 @@ type UserFormState = Record<string, { name: string; email: string; role: AdminRo
 export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'payments' | 'shipping' | 'coupons' | 'newsletter' | 'settings' | 'logs';
 
 const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: string }> = [
-  { key: 'overview', label: 'Visao geral', description: 'Resumo da loja' },
+  { key: 'overview', label: 'Visão geral', description: 'Resumo da loja' },
   { key: 'orders', label: 'Pedidos', description: 'Status e envio' },
-  { key: 'customers', label: 'Clientes', description: 'Contas e enderecos' },
-  { key: 'products', label: 'Produtos', description: 'Catalogo e imagens' },
+  { key: 'customers', label: 'Clientes', description: 'Contas e endereços' },
+  { key: 'products', label: 'Produtos', description: 'Catálogo e imagens' },
   { key: 'payments', label: 'Pagamentos', description: 'Mercado Pago' },
   { key: 'shipping', label: 'Frete', description: 'Melhor Envio' },
-  { key: 'coupons', label: 'Cupons', description: 'Promocoes' },
+  { key: 'coupons', label: 'Cupons', description: 'Promoções' },
   { key: 'newsletter', label: 'Newsletter', description: 'Inscritos' },
-  { key: 'settings', label: 'Configuracoes', description: 'Integracoes' },
-  { key: 'logs', label: 'Logs', description: 'Auditoria basica' },
+  { key: 'settings', label: 'Configurações', description: 'Integrações' },
+  { key: 'logs', label: 'Logs', description: 'Auditoria básica' },
 ];
 
 const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
@@ -893,7 +893,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             <h1>Controle <span className="red">Velkor.</span></h1>
             <p>{apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}</p>
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className="admin-legacy-actions">
             <button type="button" className="btn btn-secondary" onClick={refreshAdminData} disabled={loading}>
               {loading ? 'Atualizando...' : 'Atualizar'}
             </button>
@@ -901,7 +901,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           </div>
         </section>
 
-        <section className="admin-stat-grid" style={{ marginBottom: 32 }}>
+        <section className="admin-stat-grid admin-stats-section">
           <StatCard label="Receita" value={formatPrice(totals.revenue)} tone={totals.revenue > 0 ? 'success' : 'default'} />
           <StatCard label="Pedidos" value={orders.length} hint={`${totals.pending} pendentes`} />
           <StatCard label="Produtos" value={adminProducts.length} hint="itens cadastrados" />
@@ -910,12 +910,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         </section>
 
         {error ? (
-          <section className="info-content" style={{ marginBottom: 24 }}>
-            <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p>
+          <section className="info-content admin-content-error">
+            <p className="admin-error-notice">{error}</p>
           </section>
         ) : null}
 
-        <section className="info-content" style={{ marginBottom: 32 }} hidden>
+        <section className="info-content" hidden>
           <div className="account-grid">
             <div className="info-block">
               <h2>Receita demo</h2>
@@ -968,8 +968,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           <article className="info-content">
             {activeSection === 'overview' ? (
             <SectionCard
-              title="Pulso da operacao"
-              description="Resumo rapido para abrir o painel e entender o que precisa de atencao."
+              title="Pulso da operação"
+              description="Resumo rápido para abrir o painel e entender o que precisa de atenção."
               className="admin-dashboard-pulse"
             >
               <div className="admin-pulse-grid">
@@ -1053,7 +1053,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         </div>
                         <div className="meta">{order.status.toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <div className="admin-order-actions">
                         <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
                           Pagamento {order.paymentStatus || 'pending'}
                         </StatusBadge>
@@ -1285,7 +1285,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             </section>
 
             <section className="info-block" hidden={activeSection !== 'products'}>
-              <h2>Catalogo admin</h2>
+              <h2>Catálogo admin</h2>
               <div className="form-block account-form" style={{ marginBottom: 28 }}>
                 <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'end' }}>
                   <div>
@@ -1567,7 +1567,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                       <div className="meta">{product.brand} · {product.category}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div className="admin-order-actions">
                       <StatusBadge tone={product.active ? 'success' : 'neutral'}>
                         {product.active ? 'Ativo' : 'Inativo'}
                       </StatusBadge>
@@ -1842,7 +1842,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                       <h5>{coupon.code}</h5>
                       <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div className="admin-order-actions">
                       <StatusBadge tone={coupon.active ? 'success' : 'neutral'}>{coupon.active ? 'Ativo' : 'Inativo'}</StatusBadge>
                       <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
                         {coupon.active ? 'Desativar' : 'Ativar'}
@@ -1887,7 +1887,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         <h5>{subscriber.email}</h5>
                         <div className="meta">{subscriber.source} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <div className="admin-order-actions">
                         <StatusBadge tone={subscriber.isActive ? 'success' : 'neutral'}>{subscriber.isActive ? 'Ativo' : 'Inativo'}</StatusBadge>
                         <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
                           {subscriber.isActive ? 'Desativar' : 'Ativar'}
