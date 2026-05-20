@@ -734,10 +734,27 @@ async function updateNewsletterSubscriber(id, patch, adminUserId) {
   return { subscriber: toNewsletterSubscriber(subscriber), storage: 'database' };
 }
 
+async function getOrderForPaymentLink(id, adminUserId) {
+  const prisma = getPrisma();
+  if (!prisma) return { order: null, storage: 'demo' };
+  const order = await prisma.$transaction(async tx => {
+    const found = await tx.order.findUnique({
+      where: { id },
+      include: { items: true, shippingAddress: true },
+    });
+    if (found) {
+      await logAdminAction(tx, { adminUserId, action: 'order.payment_link.generate', targetType: 'order', targetId: id });
+    }
+    return found;
+  });
+  return { order, storage: 'database' };
+}
+
 module.exports = {
   buildAdminSettings,
   createCoupon,
   createProduct,
+  getOrderForPaymentLink,
   listAdminOrders,
   getOrderForNotification,
   getUserForEmailVerification,

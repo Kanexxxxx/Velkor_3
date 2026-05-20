@@ -329,6 +329,19 @@ export async function updateNewsletterSubscriber(id: string, patch: Partial<Pick
   return data.subscriber;
 }
 
+export interface AdminPaymentPreference {
+  preferenceId: string;
+  initPoint: string;
+  sandbox: boolean;
+}
+
+export async function generateAdminOrderPaymentLink(id: string) {
+  return request<{ ok: boolean; preference: AdminPaymentPreference }>(
+    `/api/admin/orders/${encodeURIComponent(id)}/payment-link`,
+    { method: 'POST' },
+  );
+}
+
 export async function legacyUnlock(password: string) {
   return request<{ ok: boolean; deprecated?: boolean }>('/api/admin/unlock', {
     method: 'POST',

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ActionButton, EmptyState, PageHeader, SectionCard, StatCard, StatusBadge } from '@/components/operational';
+import { ActionButton, ConfirmDialog, EmptyState, PageHeader, SectionCard, StatCard, StatusBadge } from '@/components/operational';
 import { getInfoHref } from '@/services/infoPages';
 import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
@@ -11,6 +11,7 @@ import {
   createAdminCoupon,
   fetchAdminCoupons,
   fetchAdminUsers,
+  generateAdminOrderPaymentLink,
   importAdminProducts,
   fetchAdminOrders,
   fetchAdminProducts,
@@ -245,6 +246,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
   const [orderEmailSendingId, setOrderEmailSendingId] = useState<string | null>(null);
   const [orderShippingSavingId, setOrderShippingSavingId] = useState<string | null>(null);
+  const [cancelConfirmOrder, setCancelConfirmOrder] = useState<Order | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [paymentLinkGeneratingId, setPaymentLinkGeneratingId] = useState<string | null>(null);
   const [orderTrackingDrafts, setOrderTrackingDrafts] = useState<Record<string, string>>({});
   const [adminOrderSearch, setAdminOrderSearch] = useState('');
   const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState<'all' | Order['status']>('all');
@@ -706,6 +710,40 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     }
   }
 
+  async function handleCancelOrder() {
+    if (!cancelConfirmOrder) return;
+    const order = cancelConfirmOrder;
+    try {
+      setCancellingOrderId(order.id);
+      const saved = await updateAdminOrderStatus(order.id, 'cancelled');
+      setOrders(current => current.map(o => o.id === order.id ? { ...o, ...saved } : o));
+      setError('Pedido cancelado.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível cancelar o pedido.');
+    } finally {
+      setCancellingOrderId(null);
+      setCancelConfirmOrder(null);
+    }
+  }
+
+  async function handleGeneratePaymentLink(order: Order) {
+    try {
+      setPaymentLinkGeneratingId(order.id);
+      const result = await generateAdminOrderPaymentLink(order.id);
+      if (result?.preference?.initPoint) {
+        const copied = await navigator.clipboard.writeText(result.preference.initPoint).then(() => true).catch(() => false);
+        setError(copied
+          ? 'Link de pagamento copiado! Cole no WhatsApp ou email do cliente.'
+          : `Link gerado (copie manualmente): ${result.preference.initPoint}`
+        );
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Não foi possível gerar o link de pagamento.');
+    } finally {
+      setPaymentLinkGeneratingId(null);
+    }
+  }
+
   async function handleUserSubmit(event: FormEvent<HTMLFormElement>, user: AdminUser) {
     event.preventDefault();
     const form = userForms[user.id];
@@ -865,6 +903,17 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
 
   return (
     <main className="info-page">
+      <ConfirmDialog
+        open={cancelConfirmOrder !== null}
+        title="Cancelar pedido"
+        description={`Tem certeza que deseja cancelar o pedido #${cancelConfirmOrder?.id.slice(0, 8)}? Esta ação não pode ser desfeita.`}
+        confirmLabel="Cancelar pedido"
+        cancelLabel="Manter pedido"
+        danger
+        loading={cancellingOrderId === cancelConfirmOrder?.id}
+        onConfirm={handleCancelOrder}
+        onCancel={() => setCancelConfirmOrder(null)}
+      />
       <div className="container">
         <div className="crumbs">
           <Link href="/">Inicio</Link>
@@ -1073,8 +1122,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         >
                           <option value="pending">Pendente</option>
                           <option value="paid">Pago</option>
+                          <option value="processing">Processando</option>
                           <option value="fulfilled">Enviado</option>
-                          <option value="cancelled">Cancelado</option>
                         </select>
                         <button
                           type="button"
@@ -1084,6 +1133,26 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         >
                           {orderEmailSendingId === order.id ? 'Enviando...' : 'Reenviar email'}
                         </button>
+                        {(order.paymentStatus !== 'approved' || order.status === 'pending') ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => handleGeneratePaymentLink(order)}
+                            disabled={paymentLinkGeneratingId === order.id || apiMode !== 'real'}
+                          >
+                            {paymentLinkGeneratingId === order.id ? 'Gerando...' : 'Copiar link pag.'}
+                          </button>
+                        ) : null}
+                        {order.status !== 'cancelled' ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setCancelConfirmOrder(order)}
+                            disabled={cancellingOrderId === order.id || apiMode !== 'real'}
+                          >
+                            Cancelar pedido
+                          </button>
+                        ) : null}
                         <input
                           value={orderTrackingDrafts[order.id] ?? order.trackingCode ?? ''}
                           onChange={event => setOrderTrackingDrafts(current => ({ ...current, [order.id]: event.target.value }))}
