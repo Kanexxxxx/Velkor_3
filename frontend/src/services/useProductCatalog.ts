@@ -71,7 +71,7 @@ export function useProductDetail(initialProduct: Product) {
     setStatus('loading');
     setError('');
 
-    fetchProduct(initialProduct.id)
+    fetchProduct(initialProduct.slug || initialProduct.id)
       .then(apiProduct => {
         if (!active) return;
         setProduct(apiProduct);

@@ -19,6 +19,7 @@ export function generateStaticParams() {
 function createPendingProduct(id: string): Product {
   return {
     id,
+    slug: id,
     name: 'Carregando produto',
     category: 'apparel',
     brand: 'VELKOR',
