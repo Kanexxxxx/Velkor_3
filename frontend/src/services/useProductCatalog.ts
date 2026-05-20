@@ -111,11 +111,18 @@ export function useProductsById(productIds: string[]) {
     setStatus('loading');
     setError('');
 
-    Promise.all(ids.map(id => fetchProduct(id)))
-      .then(products => {
+    Promise.allSettled(ids.map(id => fetchProduct(id)))
+      .then(results => {
         if (!active) return;
-        setProductsById(Object.fromEntries(products.map(product => [product.id, product])));
-        setStatus('ready');
+        const products = results
+          .filter((result): result is PromiseFulfilledResult<Product> => result.status === 'fulfilled')
+          .map(result => result.value);
+        setProductsById(Object.fromEntries(products.flatMap(product => [
+          [product.id, product],
+          [product.slug || product.id, product],
+        ])));
+        setStatus(products.length === ids.length ? 'ready' : 'error');
+        setError(products.length === ids.length ? '' : 'Alguns produtos da sacola nao foram encontrados.');
       })
       .catch(() => {
         if (!active) return;
