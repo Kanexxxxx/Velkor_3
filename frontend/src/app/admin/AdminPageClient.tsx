@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ActionButton, PageHeader, SectionCard, StatCard, StatusBadge } from '@/components/operational';
+import { ActionButton, EmptyState, PageHeader, SectionCard, StatCard, StatusBadge } from '@/components/operational';
 import { getInfoHref } from '@/services/infoPages';
 import { formatPrice, products as fallbackProducts } from '@/services/products';
 import { readOrders } from '@/services/orders';
@@ -228,6 +228,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [couponError, setCouponError] = useState('');
   const [newsletterSavingId, setNewsletterSavingId] = useState<string | null>(null);
   const [orderSavingId, setOrderSavingId] = useState<string | null>(null);
+  const [adminOrderSearch, setAdminOrderSearch] = useState('');
+  const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState<'all' | Order['status']>('all');
+  const [adminOrderPage, setAdminOrderPage] = useState(1);
   const [unlocked, setUnlocked] = useState(false);
   const [attempt, setAttempt] = useState('');
   const [error, setError] = useState('');
@@ -374,6 +377,35 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
   }, [adminProducts, orders]);
+
+  const adminOrderPageSize = 8;
+  const filteredAdminOrders = useMemo(() => {
+    const query = adminOrderSearch.trim().toLowerCase();
+    return orders.filter(order => {
+      const matchesStatus = adminOrderStatusFilter === 'all' || order.status === adminOrderStatusFilter;
+      const itemText = order.items.map(item => `${item.productId} ${item.name ?? ''}`).join(' ');
+      const matchesQuery = !query || [
+        order.id,
+        order.status,
+        order.paymentStatus,
+        order.paymentPreferenceId,
+        order.contact?.name,
+        order.contact?.email,
+        itemText,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [adminOrderSearch, adminOrderStatusFilter, orders]);
+
+  const adminOrderPageCount = Math.max(1, Math.ceil(filteredAdminOrders.length / adminOrderPageSize));
+  const visibleAdminOrders = filteredAdminOrders.slice(
+    (adminOrderPage - 1) * adminOrderPageSize,
+    adminOrderPage * adminOrderPageSize,
+  );
+
+  useEffect(() => {
+    setAdminOrderPage(1);
+  }, [adminOrderSearch, adminOrderStatusFilter, orders.length]);
 
   const categoryCounts = adminProducts.reduce<Record<string, number>>((counts, product) => {
     counts[product.category] = (counts[product.category] ?? 0) + 1;
@@ -814,8 +846,29 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             <section className="info-block" hidden={!['overview', 'orders'].includes(activeSection)}>
               <h2>Pedidos recentes</h2>
               {orders.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de pedidos do admin">
+                  <input
+                    value={adminOrderSearch}
+                    onChange={event => setAdminOrderSearch(event.target.value)}
+                    placeholder="Buscar por pedido, cliente, email ou produto"
+                    aria-label="Buscar pedidos"
+                  />
+                  <select
+                    value={adminOrderStatusFilter}
+                    onChange={event => setAdminOrderStatusFilter(event.target.value as 'all' | Order['status'])}
+                    aria-label="Filtrar status dos pedidos"
+                  >
+                    <option value="all">Todos os status</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="paid">Pagos</option>
+                    <option value="fulfilled">Enviados</option>
+                    <option value="cancelled">Cancelados</option>
+                  </select>
+                </div>
+                {visibleAdminOrders.length ? (
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {orders.slice(0, 6).map(order => (
+                  {visibleAdminOrders.map(order => (
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={order.id}>
                       <div>
                         <h5>{order.id}</h5>
@@ -838,6 +891,34 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     </div>
                   ))}
                 </div>
+                ) : (
+                  <EmptyState
+                    title="Nenhum pedido encontrado"
+                    description="Ajuste a busca ou limpe o filtro de status para ver mais pedidos."
+                  />
+                )}
+                {adminOrderPageCount > 1 ? (
+                  <div className="account-pagination" aria-label="Paginacao de pedidos do admin">
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={adminOrderPage <= 1}
+                      onClick={() => setAdminOrderPage(page => Math.max(1, page - 1))}
+                    >
+                      Anterior
+                    </ActionButton>
+                    <span>Pagina {adminOrderPage} de {adminOrderPageCount}</span>
+                    <ActionButton
+                      type="button"
+                      tone="secondary"
+                      disabled={adminOrderPage >= adminOrderPageCount}
+                      onClick={() => setAdminOrderPage(page => Math.min(adminOrderPageCount, page + 1))}
+                    >
+                      Proxima
+                    </ActionButton>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <p>Nenhum pedido criado ainda. Finalize um checkout para alimentar este painel.</p>
               )}
