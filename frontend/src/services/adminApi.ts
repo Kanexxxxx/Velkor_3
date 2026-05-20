@@ -277,6 +277,13 @@ export async function updateAdminUser(id: string, patch: Partial<Pick<AdminUser,
   return data.user;
 }
 
+export async function resendAdminUserVerification(id: string) {
+  return request<{ ok: boolean; email?: { sent?: boolean; mode?: string; reason?: string } }>(
+    `/api/admin/users/${encodeURIComponent(id)}/resend-verification`,
+    { method: 'POST' },
+  );
+}
+
 export async function fetchAdminCoupons() {
   const data = await request<{ coupons: AdminCoupon[] }>('/api/admin/coupons');
   return data.coupons ?? [];

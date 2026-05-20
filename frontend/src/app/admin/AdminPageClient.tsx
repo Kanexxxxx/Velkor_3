@@ -22,6 +22,7 @@ import {
   legacyUnlock,
   previewAdminProductImport,
   resendAdminOrderConfirmation,
+  resendAdminUserVerification,
   updateAdminCoupon,
   updateAdminOrderStatus,
   updateAdminProduct,
@@ -235,6 +236,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [newsletterSearch, setNewsletterSearch] = useState('');
   const [newsletterStatusFilter, setNewsletterStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
+  const [userVerificationSendingId, setUserVerificationSendingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
   const [couponError, setCouponError] = useState('');
@@ -710,6 +712,25 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     }
   }
 
+  async function handleResendUserVerification(user: AdminUser) {
+    setUserVerificationSendingId(user.id);
+    setUserError('');
+    try {
+      const result = await resendAdminUserVerification(user.id);
+      if (result.email?.reason === 'already_verified') {
+        setUserError('Este cliente ja esta com email verificado.');
+      } else {
+        setUserError(result.email?.sent === false
+          ? 'Email de verificacao nao enviado. Confira SMTP e logs.'
+          : 'Verificacao reenviada para o cliente.');
+      }
+    } catch (err) {
+      setUserError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a verificacao.');
+    } finally {
+      setUserVerificationSendingId(null);
+    }
+  }
+
   async function handleCouponSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCouponSaving(true);
@@ -1175,6 +1196,15 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         <div>
                           <button type="submit" className="btn btn-primary" disabled={userSavingId === user.id || apiMode !== 'real'}>
                             {userSavingId === user.id ? 'Salvando...' : 'Salvar cliente'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ marginLeft: 10 }}
+                            onClick={() => handleResendUserVerification(user)}
+                            disabled={userVerificationSendingId === user.id || user.emailVerified || apiMode !== 'real'}
+                          >
+                            {userVerificationSendingId === user.id ? 'Enviando...' : 'Reenviar verificacao'}
                           </button>
                         </div>
                       </form>

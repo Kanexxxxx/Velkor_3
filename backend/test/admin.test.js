@@ -217,6 +217,48 @@ test('admin route resends order confirmation email for admins', async () => {
   assert.deepEqual(JSON.parse(res.body).email, { sent: true, mode: 'smtp' });
 });
 
+test('admin route resends customer email verification for admins', async () => {
+  const { createAdminHandler } = require('../src/routes/admin');
+  const res = makeRes();
+  const sent = [];
+  let requestedUserId = null;
+  let tokenUserId = null;
+  const handler = createAdminHandler({
+    authRepo: {
+      findSessionUser: async () => ({ user: { id: 'adm_verify', role: 'ADMIN' } }),
+      createEmailVerificationToken: async userId => {
+        tokenUserId = userId;
+        return 'admin-verify-token';
+      },
+    },
+    appConfig: { VELKOR_PUBLIC_URL: 'https://volkerr.test' },
+    repo: {
+      getUserForEmailVerification: async id => {
+        requestedUserId = id;
+        return {
+          user: { id, email: 'cliente@example.com', emailVerified: false },
+          storage: 'database',
+        };
+      },
+    },
+    emailService: {
+      sendEmailVerification: async payload => {
+        sent.push(payload);
+        return { sent: true, mode: 'smtp' };
+      },
+    },
+  });
+
+  assert.equal(await handler(makeReq({ method: 'POST', url: '/api/admin/users/user_2/resend-verification' }), res, null), true);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(requestedUserId, 'user_2');
+  assert.equal(tokenUserId, 'user_2');
+  assert.equal(sent[0].to, 'cliente@example.com');
+  assert.equal(sent[0].verificationUrl, 'https://volkerr.test/account/verify-email?token=admin-verify-token');
+  assert.deepEqual(JSON.parse(res.body).email, { sent: true, mode: 'smtp' });
+});
+
 test('admin route lists audit logs for admins', async () => {
   const { createAdminHandler } = require('../src/routes/admin');
   const res = makeRes();

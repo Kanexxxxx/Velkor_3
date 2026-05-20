@@ -241,6 +241,32 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
         return true;
       }
 
+      if (url.pathname.startsWith('/api/admin/users/') && url.pathname.endsWith('/resend-verification') && req.method === 'POST') {
+        const id = extractId(url.pathname, '/api/admin/users/', '/resend-verification');
+        const result = await repo.getUserForEmailVerification(id, adminUserId);
+        if (!result?.user) {
+          sendJson(res, 404, { error: 'Cliente nao encontrado.' }, corsOrigin);
+          return true;
+        }
+        if (result.user.emailVerified) {
+          sendJson(res, 200, { ok: true, email: { sent: false, reason: 'already_verified' } }, corsOrigin);
+          return true;
+        }
+
+        const token = await authRepo.createEmailVerificationToken(result.user.id);
+        if (!token) {
+          sendJson(res, 503, { error: 'Nao foi possivel gerar verificacao de email.' }, corsOrigin);
+          return true;
+        }
+        const publicUrl = appConfig.VELKOR_PUBLIC_URL || 'http://localhost:3000';
+        const email = await adminEmailService.sendEmailVerification({
+          to: result.user.email,
+          verificationUrl: `${publicUrl}/account/verify-email?token=${encodeURIComponent(token)}`,
+        });
+        sendJson(res, 200, { ok: true, email }, corsOrigin);
+        return true;
+      }
+
       if (url.pathname === '/api/admin/coupons' && req.method === 'GET') {
         sendJson(res, 200, await repo.listCoupons(), corsOrigin);
         return true;

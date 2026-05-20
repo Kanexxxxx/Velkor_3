@@ -521,6 +521,22 @@ async function updateAdminUser(id, patch, adminUserId) {
   return { user: toAdminUser(user), storage: 'database' };
 }
 
+async function getUserForEmailVerification(id, adminUserId) {
+  const prisma = getPrisma();
+  if (!prisma) return { user: null, storage: 'demo' };
+  const user = await prisma.$transaction(async tx => {
+    const found = await tx.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, emailVerified: true },
+    });
+    if (found) {
+      await logAdminAction(tx, { adminUserId, action: 'user.email.resend_verification', targetType: 'user', targetId: id });
+    }
+    return found;
+  });
+  return { user, storage: 'database' };
+}
+
 async function listCoupons() {
   const prisma = getPrisma();
   if (!prisma) return { coupons: [], storage: 'demo' };
@@ -684,6 +700,7 @@ module.exports = {
   createProduct,
   listAdminOrders,
   getOrderForNotification,
+  getUserForEmailVerification,
   listAdminAuditLogs,
   listAdminProducts,
   listAdminUsers,
