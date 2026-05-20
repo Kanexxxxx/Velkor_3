@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNotifications } from '@/components/notifications/NotificationProvider';
-import { ConfirmDialog, EmptyState, SectionCard, StatusBadge } from '@/components/operational';
+import { ConfirmDialog, EmptyState, LoadingSkeleton, SectionCard, StatusBadge } from '@/components/operational';
 import { useWishlist } from '@/components/wishlist/WishlistProvider';
 import { isAccountApiUnavailable, listOrders as listAccountOrders, requestEmailVerification } from '@/services/accountApi';
 import { isStrongPassword, isValidEmail } from '@/services/auth';
@@ -330,7 +330,7 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
         </header>
 
         {user.emailVerified === false ? (
-          <section className="info-block" style={{ marginBottom: 24 }}>
+          <section className="info-block account-verify-notice">
             <h2>Confirme seu email</h2>
             <p>Os avisos de pedido, envio e recuperacao de senha chegam em {user.email}.</p>
             <button
@@ -387,9 +387,25 @@ function AccountDashboard({ tab, onLogout }: AccountDashboardProps) {
               </StatusBadge>
             </div>
             <div>
-              <span>Pedidos</span>
-              <strong>{ordersLoading ? '...' : orders.length}</strong>
-              <Link href="/account/orders" scroll={false}>Ver historico</Link>
+              <span>Último pedido</span>
+              {orders.length > 0 ? (
+                <>
+                  <strong>#{orders[0].id.slice(0, 8)}</strong>
+                  <StatusBadge tone={
+                    orderStatusLabels[orders[0].status]?.tone === 'cancelled' ? 'danger' :
+                    orderStatusLabels[orders[0].status]?.tone === 'pending' ? 'warning' :
+                    'success'
+                  }>
+                    {orderStatusLabels[orders[0].status]?.label ?? orders[0].status}
+                  </StatusBadge>
+                  <Link href={`/account/orders/${encodeURIComponent(orders[0].id)}`} scroll={false}>Ver detalhes</Link>
+                </>
+              ) : (
+                <>
+                  <strong>—</strong>
+                  <Link href="/shop">Explorar loja</Link>
+                </>
+              )}
             </div>
             <div>
               <span>Favoritos</span>
@@ -548,9 +564,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           <h2>Meus pedidos</h2>
           <p>Histórico completo, status atual e detalhes de cada compra.</p>
         </header>
-        <div className="empty-state" style={{ opacity: 0.6 }}>
-          <p>Carregando pedidos...</p>
-        </div>
+        <LoadingSkeleton lines={4} />
       </article>
     );
   }
@@ -599,7 +613,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           <input
             type="search"
             value={query}
-            placeholder="Codigo ou ID do pedido"
+            placeholder="Código ou ID do pedido"
             onChange={event => setQuery(event.target.value)}
           />
         </label>
@@ -611,7 +625,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
             <option value="paid">Pago</option>
             <option value="approved">Pagamento aprovado</option>
             <option value="shipped">Enviado</option>
-            <option value="fulfilled">Concluido</option>
+            <option value="fulfilled">Concluído</option>
             <option value="cancelled">Cancelado</option>
             <option value="rejected">Pagamento recusado</option>
           </select>
@@ -640,7 +654,7 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
                   <span className="order-code">#{order.id}</span>
                   <span className="order-date">{formatDate(order.createdAt)}</span>
                 </div>
-                <span className={`order-status status-${status.tone}`}>{status.label}</span>
+                <StatusBadge tone={toneToStatusTone(status.tone)}>{status.label}</StatusBadge>
                 <span className="order-total">{formatPrice(order.total)}</span>
               </summary>
               <div className="order-body">
@@ -657,12 +671,20 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
                 </div>
                 <dl className="order-grid">
                   <div><dt>Pagamento</dt><dd>{paymentLabel(payment)}</dd></div>
-                  <div><dt>Status do pagamento</dt><dd>{paymentStatusLabel(order.paymentStatus)}</dd></div>
+                  <div>
+                    <dt>Status do pagamento</dt>
+                    <dd>
+                      <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
+                        {paymentStatusLabel(order.paymentStatus)}
+                      </StatusBadge>
+                    </dd>
+                  </div>
                   <div><dt>Entrega</dt><dd>{shippingMethodLabel(shipping)}</dd></div>
                   <div><dt>Frete</dt><dd>{shippingCost ? formatPrice(shippingCost) : 'Grátis'}</dd></div>
                   <div><dt>Imposto estimado</dt><dd>{formatPrice(tax)}</dd></div>
                   {discount > 0 ? <div><dt>Desconto</dt><dd>-{formatPrice(discount)}</dd></div> : null}
                   {address ? <div><dt>Endereço</dt><dd>{address.street}, {address.city}/{address.region}</dd></div> : null}
+                  {order.trackingCode ? <div><dt>Rastreio</dt><dd>{order.trackingCode}</dd></div> : null}
                 </dl>
                 <div className="order-actions">
                   <Link className="btn btn-ghost" href={`/account/orders/${encodeURIComponent(order.id)}`}>
@@ -690,14 +712,22 @@ function OrdersPanel({ orders, loading, error, onRetry, payingOrderId, onPayOrde
           <button type="button" className="btn btn-ghost" disabled={safePage <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>
             Anterior
           </button>
-          <span>Pagina {safePage} de {pageCount}</span>
+          <span>Página {safePage} de {pageCount}</span>
           <button type="button" className="btn btn-ghost" disabled={safePage >= pageCount} onClick={() => setPage(value => Math.min(pageCount, value + 1))}>
-            Proxima
+            Próxima
           </button>
         </div>
       ) : null}
     </article>
   );
+}
+
+function toneToStatusTone(tone: string): 'success' | 'warning' | 'danger' | 'neutral' | 'info' {
+  if (tone === 'paid' || tone === 'delivered') return 'success';
+  if (tone === 'cancelled') return 'danger';
+  if (tone === 'shipped') return 'info';
+  if (tone === 'pending') return 'warning';
+  return 'neutral';
 }
 
 function paymentLabel(payment: string | undefined) {
@@ -736,30 +766,53 @@ function AddressesPanel() {
   const [addressToRemove, setAddressToRemove] = useState<Address | null>(null);
   const [addressRemoving, setAddressRemoving] = useState(false);
 
+  type AddressFormState = {
+    label: string; recipient: string; street: string; complement: string;
+    city: string; region: string; postalCode: string; country: string;
+    phone: string; isDefault: boolean;
+  };
+  const makeEmptyForm = (): AddressFormState => ({
+    label: 'Casa', recipient: user?.name ?? '', street: '', complement: '',
+    city: '', region: '', postalCode: '', country: 'Brasil',
+    phone: user?.phone ?? '', isDefault: (user?.addresses.length ?? 0) === 0,
+  });
+  const [form, setForm] = useState<AddressFormState>(makeEmptyForm);
+  const [cepLoading, setCepLoading] = useState(false);
+
   if (!user) return null;
+
+  async function handleCepChange(value: string) {
+    const digits = value.replace(/\D/g, '');
+    setForm(s => ({ ...s, postalCode: value }));
+    if (digits.length !== 8) return;
+    try {
+      setCepLoading(true);
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setForm(s => ({
+          ...s,
+          street: data.logradouro || s.street,
+          city: data.localidade || s.city,
+          region: data.uf || s.region,
+        }));
+      }
+    } catch {
+      // silent fail — user fills manually
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const payload: Omit<Address, 'id'> & { id?: string } = {
-      id: editing?.id,
-      label: String(data.get('label') ?? 'Endereço'),
-      recipient: String(data.get('recipient') ?? ''),
-      street: String(data.get('street') ?? ''),
-      complement: String(data.get('complement') ?? ''),
-      city: String(data.get('city') ?? ''),
-      region: String(data.get('region') ?? ''),
-      postalCode: String(data.get('postalCode') ?? ''),
-      country: String(data.get('country') ?? 'Brasil'),
-      phone: String(data.get('phone') ?? ''),
-      isDefault: data.get('isDefault') === 'on'
-    };
-
+    const payload: Omit<Address, 'id'> & { id?: string } = { id: editing?.id, ...form };
     try {
       await upsertAddress(payload);
       notify(editing ? 'Endereço atualizado.' : 'Endereço salvo.', 'success');
       setEditing(null);
       setOpen(false);
+      setForm(makeEmptyForm());
     } catch (error) {
       notify((error as Error).message, 'error');
     }
@@ -775,7 +828,7 @@ function AddressesPanel() {
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() => { setEditing(null); setOpen(true); }}
+          onClick={() => { setEditing(null); setForm(makeEmptyForm()); setOpen(true); }}
         >
           Novo endereço
         </button>
@@ -802,7 +855,16 @@ function AddressesPanel() {
               <p>{address.city} / {address.region} · {address.postalCode}</p>
               <p>{address.country}{address.phone ? ` · ${address.phone}` : ''}</p>
               <div className="address-card-actions">
-                <button type="button" onClick={() => { setEditing(address); setOpen(true); }}>Editar</button>
+                <button type="button" onClick={() => {
+                  setEditing(address);
+                  setForm({
+                    label: address.label, recipient: address.recipient, street: address.street,
+                    complement: address.complement ?? '', city: address.city, region: address.region,
+                    postalCode: address.postalCode, country: address.country,
+                    phone: address.phone ?? '', isDefault: address.isDefault ?? false,
+                  });
+                  setOpen(true);
+                }}>Editar</button>
                 {!address.isDefault ? (
                   <button type="button" onClick={async () => { await makeAddressDefault(address.id); notify('Endereço padrão atualizado.', 'success'); }}>
                     Tornar padrão
@@ -821,26 +883,26 @@ function AddressesPanel() {
         <form className="form-block account-form" onSubmit={handleSubmit}>
           <h3>{editing ? 'Editar endereço' : 'Novo endereço'}</h3>
           <div className="field-row cols-2">
-            <div className="field"><label htmlFor="addr-label">Apelido</label><input id="addr-label" name="label" type="text" defaultValue={editing?.label ?? 'Casa'} required /></div>
-            <div className="field"><label htmlFor="addr-recipient">Quem recebe</label><input id="addr-recipient" name="recipient" type="text" defaultValue={editing?.recipient ?? user.name} required /></div>
+            <div className="field"><label htmlFor="addr-label">Apelido</label><input id="addr-label" name="label" type="text" value={form.label} required onChange={e => setForm(s => ({ ...s, label: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-recipient">Quem recebe</label><input id="addr-recipient" name="recipient" type="text" value={form.recipient} required onChange={e => setForm(s => ({ ...s, recipient: e.target.value }))} /></div>
           </div>
           <div className="field-row">
-            <div className="field"><label htmlFor="addr-street">Rua e número</label><input id="addr-street" name="street" type="text" defaultValue={editing?.street ?? ''} required /></div>
+            <div className="field"><label htmlFor="addr-street">Rua e número</label><input id="addr-street" name="street" type="text" value={form.street} required onChange={e => setForm(s => ({ ...s, street: e.target.value }))} /></div>
           </div>
           <div className="field-row">
-            <div className="field"><label htmlFor="addr-complement">Complemento</label><input id="addr-complement" name="complement" type="text" defaultValue={editing?.complement ?? ''} /></div>
+            <div className="field"><label htmlFor="addr-complement">Complemento</label><input id="addr-complement" name="complement" type="text" value={form.complement} onChange={e => setForm(s => ({ ...s, complement: e.target.value }))} /></div>
           </div>
           <div className="field-row cols-3">
-            <div className="field"><label htmlFor="addr-city">Cidade</label><input id="addr-city" name="city" type="text" defaultValue={editing?.city ?? ''} required /></div>
-            <div className="field"><label htmlFor="addr-region">Estado</label><input id="addr-region" name="region" type="text" defaultValue={editing?.region ?? ''} required /></div>
-            <div className="field"><label htmlFor="addr-postal">CEP</label><input id="addr-postal" name="postalCode" type="text" defaultValue={editing?.postalCode ?? ''} required /></div>
+            <div className="field"><label htmlFor="addr-city">Cidade</label><input id="addr-city" name="city" type="text" value={form.city} required onChange={e => setForm(s => ({ ...s, city: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-region">Estado</label><input id="addr-region" name="region" type="text" value={form.region} required onChange={e => setForm(s => ({ ...s, region: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-postal">CEP {cepLoading ? <span className="cep-loading">buscando...</span> : null}</label><input id="addr-postal" name="postalCode" type="text" value={form.postalCode} placeholder="00000-000" required onChange={e => handleCepChange(e.target.value)} /></div>
           </div>
           <div className="field-row cols-2">
-            <div className="field"><label htmlFor="addr-country">País</label><input id="addr-country" name="country" type="text" defaultValue={editing?.country ?? 'Brasil'} required /></div>
-            <div className="field"><label htmlFor="addr-phone">Telefone</label><input id="addr-phone" name="phone" type="tel" defaultValue={editing?.phone ?? user.phone ?? ''} /></div>
+            <div className="field"><label htmlFor="addr-country">País</label><input id="addr-country" name="country" type="text" value={form.country} required onChange={e => setForm(s => ({ ...s, country: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="addr-phone">Telefone</label><input id="addr-phone" name="phone" type="tel" value={form.phone} onChange={e => setForm(s => ({ ...s, phone: e.target.value }))} /></div>
           </div>
           <label className="checkbox-row">
-            <input type="checkbox" name="isDefault" defaultChecked={editing?.isDefault ?? user.addresses.length === 0} />
+            <input type="checkbox" name="isDefault" checked={form.isDefault} onChange={e => setForm(s => ({ ...s, isDefault: e.target.checked }))} />
             <span>Definir como endereço padrão</span>
           </label>
           <div className="account-form-actions">
@@ -851,8 +913,8 @@ function AddressesPanel() {
       ) : null}
       <ConfirmDialog
         open={Boolean(addressToRemove)}
-        title="Remover endereco?"
-        description="Este endereco deixa de aparecer no checkout rapido, mas seus pedidos antigos continuam preservados."
+        title="Remover endereço?"
+        description="Este endereço deixa de aparecer no checkout rápido, mas seus pedidos antigos continuam preservados."
         confirmLabel="Remover"
         danger
         loading={addressRemoving}
@@ -862,7 +924,7 @@ function AddressesPanel() {
           try {
             setAddressRemoving(true);
             await removeAddress(addressToRemove.id);
-            notify('Endereco removido.', 'info');
+            notify('Endereço removido.', 'info');
             setAddressToRemove(null);
           } catch (error) {
             notify((error as Error).message, 'error');

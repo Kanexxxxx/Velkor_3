@@ -74,16 +74,16 @@ type UserFormState = Record<string, { name: string; email: string; role: AdminRo
 export type AdminSection = 'overview' | 'orders' | 'customers' | 'products' | 'payments' | 'shipping' | 'coupons' | 'newsletter' | 'settings' | 'logs';
 
 const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; description: string }> = [
-  { key: 'overview', label: 'Visao geral', description: 'Resumo da loja' },
+  { key: 'overview', label: 'Visão geral', description: 'Resumo da loja' },
   { key: 'orders', label: 'Pedidos', description: 'Status e envio' },
-  { key: 'customers', label: 'Clientes', description: 'Contas e enderecos' },
-  { key: 'products', label: 'Produtos', description: 'Catalogo e imagens' },
+  { key: 'customers', label: 'Clientes', description: 'Contas e endereços' },
+  { key: 'products', label: 'Produtos', description: 'Catálogo e imagens' },
   { key: 'payments', label: 'Pagamentos', description: 'Mercado Pago' },
   { key: 'shipping', label: 'Frete', description: 'Melhor Envio' },
-  { key: 'coupons', label: 'Cupons', description: 'Promocoes' },
+  { key: 'coupons', label: 'Cupons', description: 'Promoções' },
   { key: 'newsletter', label: 'Newsletter', description: 'Inscritos' },
-  { key: 'settings', label: 'Configuracoes', description: 'Integracoes' },
-  { key: 'logs', label: 'Logs', description: 'Auditoria basica' },
+  { key: 'settings', label: 'Configurações', description: 'Integrações' },
+  { key: 'logs', label: 'Logs', description: 'Auditoria básica' },
 ];
 
 const ADMIN_SECTION_HREFS: Record<AdminSection, string> = {
@@ -356,7 +356,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setAdminSettings(null);
       setAdminAuditLogs([]);
       setApiMode('demo');
-      setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
+      setError('Não foi possível atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
       setLoading(false);
     }
@@ -560,7 +560,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setProductForm(emptyProductForm);
       setEditingProductId(null);
     } catch (err) {
-      setProductError(err instanceof Error ? err.message : 'Nao foi possivel salvar produto.');
+      setProductError(err instanceof Error ? err.message : 'Não foi possível salvar produto.');
     } finally {
       setProductSaving(false);
     }
@@ -574,7 +574,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Nao foi possivel ler a imagem.'));
+        reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
         reader.readAsDataURL(file);
       });
       const uploaded = await uploadAdminProductImage({ filename: file.name, dataUrl });
@@ -585,7 +585,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         images: current.images ? `${current.images}, ${imageUrl}` : imageUrl,
       }));
     } catch (err) {
-      setProductError(err instanceof Error ? err.message : 'Nao foi possivel enviar imagem.');
+      setProductError(err instanceof Error ? err.message : 'Não foi possível enviar imagem.');
     } finally {
       setProductUploading(false);
     }
@@ -602,7 +602,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const csv = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Nao foi possivel ler o CSV.'));
+        reader.onerror = () => reject(new Error('Não foi possível ler o CSV.'));
         reader.readAsText(file, 'utf-8');
       });
       const preview = await previewAdminProductImport({ filename: file.name, csv });
@@ -611,7 +611,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const firstValid = preview.preview.rows.find(row => row.status === 'valid');
       if (firstValid) setProductForm(importRowToForm(firstValid.product));
     } catch (err) {
-      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel analisar o CSV.');
+      setProductImportError(err instanceof Error ? err.message : 'Não foi possível analisar o CSV.');
     } finally {
       setProductImportLoading(false);
     }
@@ -624,7 +624,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     setProductImportSummary('');
     try {
       const result = await importAdminProducts(productImportFile);
-      setProductImportSummary(`${result.createdCount} produto(s) importado(s). ${result.failedCount} linha(s) exigem revisao.`);
+      setProductImportSummary(`${result.createdCount} produto(s) importado(s). ${result.failedCount} linha(s) exigem revisão.`);
       const createdProducts = result.results
         .filter(row => row.status === 'created')
         .map(row => row.product)
@@ -637,7 +637,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         });
       }
     } catch (err) {
-      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel importar o CSV.');
+      setProductImportError(err instanceof Error ? err.message : 'Não foi possível importar o CSV.');
     } finally {
       setProductImportLoading(false);
     }
@@ -650,7 +650,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateAdminProduct(product.id, { active: !product.active });
       setAdminProducts(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setProductError(err instanceof Error ? err.message : 'Nao foi possivel atualizar produto.');
+      setProductError(err instanceof Error ? err.message : 'Não foi possível atualizar produto.');
     } finally {
       setProductSaving(false);
     }
@@ -664,7 +664,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateAdminOrderStatus(order.id, status);
       setOrders(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar pedido.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar pedido.');
     } finally {
       setOrderSavingId(null);
     }
@@ -676,10 +676,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     try {
       const result = await resendAdminOrderConfirmation(order.id);
       setError(result.email?.sent === false
-        ? 'Email nao enviado. Confira SMTP e logs.'
-        : 'Confirmacao do pedido reenviada para o cliente.');
+        ? 'Email não enviado. Confira SMTP e logs.'
+        : 'Confirmação do pedido reenviada para o cliente.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a confirmacao.');
+      setError(err instanceof Error ? err.message : 'Não foi possível reenviar a confirmação.');
     } finally {
       setOrderEmailSendingId(null);
     }
@@ -700,7 +700,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         ? 'Pedido marcado como enviado, mas o email de envio falhou.'
         : 'Pedido marcado como enviado e email de rastreio disparado.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar o envio.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar o envio.');
     } finally {
       setOrderShippingSavingId(null);
     }
@@ -730,7 +730,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         },
       }));
     } catch (err) {
-      setUserError(err instanceof Error ? err.message : 'Nao foi possivel salvar cliente.');
+      setUserError(err instanceof Error ? err.message : 'Não foi possível salvar cliente.');
     } finally {
       setUserSavingId(null);
     }
@@ -745,11 +745,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         setUserError('Este cliente ja esta com email verificado.');
       } else {
         setUserError(result.email?.sent === false
-          ? 'Email de verificacao nao enviado. Confira SMTP e logs.'
-          : 'Verificacao reenviada para o cliente.');
+          ? 'Email de verificação não enviado. Confira SMTP e logs.'
+          : 'Verificação reenviada para o cliente.');
       }
     } catch (err) {
-      setUserError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a verificacao.');
+      setUserError(err instanceof Error ? err.message : 'Não foi possível reenviar a verificação.');
     } finally {
       setUserVerificationSendingId(null);
     }
@@ -764,7 +764,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setAdminCoupons(current => [saved, ...current.filter(coupon => coupon.id !== saved.id)]);
       setCouponForm(emptyCouponForm);
     } catch (err) {
-      setCouponError(err instanceof Error ? err.message : 'Nao foi possivel salvar cupom.');
+      setCouponError(err instanceof Error ? err.message : 'Não foi possível salvar cupom.');
     } finally {
       setCouponSaving(false);
     }
@@ -777,7 +777,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateAdminCoupon(coupon.id, { ...coupon, active: !coupon.active });
       setAdminCoupons(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setCouponError(err instanceof Error ? err.message : 'Nao foi possivel atualizar cupom.');
+      setCouponError(err instanceof Error ? err.message : 'Não foi possível atualizar cupom.');
     } finally {
       setCouponSaving(false);
     }
@@ -790,7 +790,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateNewsletterSubscriber(subscriber.id, { isActive: !subscriber.isActive });
       setNewsletterSubscribers(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar newsletter.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar newsletter.');
     } finally {
       setNewsletterSavingId(null);
     }
@@ -799,11 +799,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   if (checkingAdmin) {
     return (
       <main className="info-page">
-        <div className="container" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
-            <div className="section-num" style={{ marginBottom: 12 }}>PAINEL ADMIN</div>
-            <h1 style={{ marginBottom: 16 }}>Validando <span className="red">acesso.</span></h1>
-            <p>Conferindo sessao administrativa...</p>
+        <div className="container admin-gate-wrap">
+          <div className="admin-gate-inner">
+            <div className="section-num admin-gate-eyebrow">PAINEL ADMIN</div>
+            <h1 className="admin-gate-title">Validando <span className="red">acesso.</span></h1>
+            <p>Conferindo sessão administrativa...</p>
           </div>
         </div>
       </main>
@@ -834,12 +834,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
 
     return (
       <main className="info-page">
-        <div className="container" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
-            <div className="section-num" style={{ marginBottom: 12 }}>PAINEL ADMIN</div>
-            <h1 style={{ marginBottom: 24 }}>Acesso <span className="red">Restrito.</span></h1>
-            <p style={{ marginBottom: 24 }}>Entre com uma conta ADMIN. O acesso legado por senha permanece temporario para rollback.</p>
-            <form onSubmit={handleUnlock} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="container admin-gate-wrap">
+          <div className="admin-gate-inner">
+            <div className="section-num admin-gate-eyebrow">PAINEL ADMIN</div>
+            <h1 className="admin-gate-title--unlock">Acesso <span className="red">Restrito.</span></h1>
+            <p className="admin-gate-desc">Entre com uma conta ADMIN. O acesso legado por senha permanece temporario para rollback.</p>
+            <form onSubmit={handleUnlock} className="admin-gate-form">
               <div className="field">
                 <label htmlFor="admin-password">Senha de acesso legado</label>
                 <input
@@ -852,8 +852,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   required
                 />
               </div>
-              {error ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p> : null}
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
+              {error ? <p className="admin-gate-error">{error}</p> : null}
+              <button type="submit" className="btn btn-primary admin-gate-submit" disabled={loading}>
                 {loading ? 'Verificando...' : 'Entrar'}
               </button>
             </form>
@@ -875,7 +875,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         <PageHeader
           eyebrow="PAINEL ADMIN"
           title={<>Controle <span className="red">Velkor.</span></>}
-          description={apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}
+          description={apiMode === 'real' ? 'Dados administrativos carregados com sessão real protegida.' : 'Fallback administrativo temporario para validação e rollback controlado.'}
           actions={(
             <>
               <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode}</StatusBadge>
@@ -891,9 +891,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           <div>
             <div className="section-num">PAINEL ADMIN</div>
             <h1>Controle <span className="red">Velkor.</span></h1>
-            <p>{apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}</p>
+            <p>{apiMode === 'real' ? 'Dados administrativos carregados com sessão real protegida.' : 'Fallback administrativo temporario para validação e rollback controlado.'}</p>
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className="admin-legacy-actions">
             <button type="button" className="btn btn-secondary" onClick={refreshAdminData} disabled={loading}>
               {loading ? 'Atualizando...' : 'Atualizar'}
             </button>
@@ -901,7 +901,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           </div>
         </section>
 
-        <section className="admin-stat-grid" style={{ marginBottom: 32 }}>
+        <section className="admin-stat-grid admin-stats-section">
           <StatCard label="Receita" value={formatPrice(totals.revenue)} tone={totals.revenue > 0 ? 'success' : 'default'} />
           <StatCard label="Pedidos" value={orders.length} hint={`${totals.pending} pendentes`} />
           <StatCard label="Produtos" value={adminProducts.length} hint="itens cadastrados" />
@@ -910,12 +910,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         </section>
 
         {error ? (
-          <section className="info-content" style={{ marginBottom: 24 }}>
-            <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p>
+          <section className="info-content admin-content-error">
+            <p className="admin-error-notice">{error}</p>
           </section>
         ) : null}
 
-        <section className="info-content" style={{ marginBottom: 32 }} hidden>
+        <section className="info-content" hidden>
           <div className="account-grid">
             <div className="info-block">
               <h2>Receita demo</h2>
@@ -968,8 +968,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           <article className="info-content">
             {activeSection === 'overview' ? (
             <SectionCard
-              title="Pulso da operacao"
-              description="Resumo rapido para abrir o painel e entender o que precisa de atencao."
+              title="Pulso da operação"
+              description="Resumo rápido para abrir o painel e entender o que precisa de atenção."
               className="admin-dashboard-pulse"
             >
               <div className="admin-pulse-grid">
@@ -1010,8 +1010,16 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             </SectionCard>
             ) : null}
 
-            <section className="info-block" hidden={!['overview', 'orders'].includes(activeSection)}>
-              <h2>Pedidos recentes</h2>
+            {['overview', 'orders'].includes(activeSection) ? (
+            <SectionCard
+              title="Pedidos recentes"
+              description="Acompanhe, filtre e atualize o status de todos os pedidos da loja."
+              actions={
+                <span className="admin-section-count">
+                  {orders.length} pedido(s)
+                </span>
+              }
+            >
               {orders.length ? (
                 <>
                 <div className="account-list-tools" aria-label="Filtros de pedidos do admin">
@@ -1034,16 +1042,16 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </select>
                 </div>
                 {visibleAdminOrders.length ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {visibleAdminOrders.map(order => (
-                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={order.id}>
+                    <div className="summary-item admin-order-item" key={order.id}>
                       <div>
                         <h5>{order.id}</h5>
                         <div className="admin-order-context">
                           <span>{order.contact?.name || 'Cliente sem nome'}</span>
-                          <span>{order.contact?.email || 'email nao informado'}</span>
+                          <span>{order.contact?.email || 'email não informado'}</span>
                           <span>{order.items.length} item(ns)</span>
-                          <span>{order.shipping || 'frete nao informado'} - {formatPrice(order.shippingCost)}</span>
+                          <span>{order.shipping || 'frete não informado'} - {formatPrice(order.shippingCost)}</span>
                         </div>
                         <div className="admin-order-context">
                           <span>{order.address?.city || 'cidade n/a'}{order.address?.region ? `/${order.address.region}` : ''}</span>
@@ -1053,7 +1061,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         </div>
                         <div className="meta">{order.status.toUpperCase()} · {new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <div className="admin-order-actions">
                         <StatusBadge tone={order.paymentStatus === 'approved' ? 'success' : order.paymentStatus === 'rejected' ? 'danger' : 'warning'}>
                           Pagamento {order.paymentStatus || 'pending'}
                         </StatusBadge>
@@ -1079,9 +1087,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         <input
                           value={orderTrackingDrafts[order.id] ?? order.trackingCode ?? ''}
                           onChange={event => setOrderTrackingDrafts(current => ({ ...current, [order.id]: event.target.value }))}
-                          placeholder="Codigo de rastreio"
-                          aria-label={`Codigo de rastreio do pedido ${order.id}`}
-                          style={{ maxWidth: 180 }}
+                          placeholder="Código de rastreio"
+                          aria-label={`Código de rastreio do pedido ${order.id}`}
+                          className="admin-tracking-input"
                         />
                         <button
                           type="button"
@@ -1112,14 +1120,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     >
                       Anterior
                     </ActionButton>
-                    <span>Pagina {adminOrderPage} de {adminOrderPageCount}</span>
+                    <span>Página {adminOrderPage} de {adminOrderPageCount}</span>
                     <ActionButton
                       type="button"
                       tone="secondary"
                       disabled={adminOrderPage >= adminOrderPageCount}
                       onClick={() => setAdminOrderPage(page => Math.min(adminOrderPageCount, page + 1))}
                     >
-                      Proxima
+                      Próxima
                     </ActionButton>
                   </div>
                 ) : null}
@@ -1127,18 +1135,22 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>Nenhum pedido criado ainda. Finalize um checkout para alimentar este painel.</p>
               )}
-            </section>
+            </SectionCard>
+            ) : null}
 
-            <section className="info-block" hidden={activeSection !== 'customers'}>
-              <h2>Clientes</h2>
-              {userError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 16 }}>{userError}</p> : null}
+            {activeSection === 'customers' ? (
+            <SectionCard
+              title="Clientes"
+              description="Gerencie contas, roles, verificação de email e endereços."
+            >
+              {userError ? <p className="admin-error-notice">{userError}</p> : null}
               {adminUsers.length ? (
                 <>
                 <div className="account-list-tools" aria-label="Filtros de clientes do admin">
                   <input
                     value={customerSearch}
                     onChange={event => setCustomerSearch(event.target.value)}
-                    placeholder="Buscar por nome, email, endereco ou pedido"
+                    placeholder="Buscar por nome, email, endereço ou pedido"
                     aria-label="Buscar clientes"
                   />
                   <select
@@ -1153,7 +1165,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   <select
                     value={customerEmailFilter}
                     onChange={event => setCustomerEmailFilter(event.target.value as 'all' | 'verified' | 'pending')}
-                    aria-label="Filtrar verificacao de email"
+                    aria-label="Filtrar verificação de email"
                   >
                     <option value="all">Todos emails</option>
                     <option value="verified">Verificados</option>
@@ -1161,24 +1173,24 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </select>
                 </div>
                 {visibleAdminUsers.length ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {visibleAdminUsers.map(user => {
                     const form = userForms[user.id] ?? { name: user.name ?? '', email: user.email, role: user.role, emailVerified: user.emailVerified };
                     return (
-                      <form className="summary-item" style={{ gridTemplateColumns: '1fr', gap: 16 }} key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
+                      <form className="summary-item admin-user-form" key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
                         <div>
                           <h5>{user.email}</h5>
                           <div className="meta">
-                            {user.name || 'Cliente sem nome'} - {user.orders.length} pedidos - {user.addresses.length} enderecos
+                            {user.name || 'Cliente sem nome'} - {user.orders.length} pedidos - {user.addresses.length} endereços
                           </div>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                          <div className="admin-user-badges">
                             <StatusBadge tone={user.role === 'ADMIN' ? 'warning' : 'neutral'}>{user.role}</StatusBadge>
                             <StatusBadge tone={user.emailVerified ? 'success' : 'warning'}>
                               {user.emailVerified ? 'Email verificado' : 'Email pendente'}
                             </StatusBadge>
                           </div>
                         </div>
-                        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                        <div className="admin-user-fields">
                           <div className="field">
                             <label htmlFor={`admin-user-name-${user.id}`}>Nome</label>
                             <input
@@ -1209,7 +1221,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                             </select>
                           </div>
                         </div>
-                        <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                        <label className="admin-user-checkbox-label">
                           <input
                             type="checkbox"
                             checked={form.emailVerified}
@@ -1219,17 +1231,17 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         </label>
                         {user.addresses.length ? (
                           <div>
-                            <div className="meta" style={{ marginBottom: 8 }}>Enderecos</div>
+                            <div className="meta admin-user-section-label">Endereços</div>
                             {user.addresses.slice(0, 3).map(address => (
-                              <p key={address.id} style={{ marginBottom: 6 }}>{address.recipient} - {address.street} - {address.city}/{address.region} - {address.postalCode}</p>
+                              <p key={address.id} className="admin-user-detail-row">{address.recipient} - {address.street} - {address.city}/{address.region} - {address.postalCode}</p>
                             ))}
                           </div>
                         ) : null}
                         {user.orders.length ? (
                           <div>
-                            <div className="meta" style={{ marginBottom: 8 }}>Pedidos do cliente</div>
+                            <div className="meta admin-user-section-label">Pedidos do cliente</div>
                             {user.orders.slice(0, 4).map(order => (
-                              <p key={order.id} style={{ marginBottom: 6 }}>{order.id} - {order.status.toUpperCase()} - {formatPrice(order.total)}</p>
+                              <p key={order.id} className="admin-user-detail-row">{order.id} - {order.status.toUpperCase()} - {formatPrice(order.total)}</p>
                             ))}
                           </div>
                         ) : null}
@@ -1239,12 +1251,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           </button>
                           <button
                             type="button"
-                            className="btn btn-secondary"
-                            style={{ marginLeft: 10 }}
+                            className="btn btn-secondary admin-btn-gap"
                             onClick={() => handleResendUserVerification(user)}
                             disabled={userVerificationSendingId === user.id || user.emailVerified || apiMode !== 'real'}
                           >
-                            {userVerificationSendingId === user.id ? 'Enviando...' : 'Reenviar verificacao'}
+                            {userVerificationSendingId === user.id ? 'Enviando...' : 'Reenviar verificação'}
                           </button>
                         </div>
                       </form>
@@ -1267,14 +1278,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     >
                       Anterior
                     </ActionButton>
-                    <span>Pagina {customerPage} de {customerPageCount}</span>
+                    <span>Página {customerPage} de {customerPageCount}</span>
                     <ActionButton
                       type="button"
                       tone="secondary"
                       disabled={customerPage >= customerPageCount}
                       onClick={() => setCustomerPage(page => Math.min(customerPageCount, page + 1))}
                     >
-                      Proxima
+                      Próxima
                     </ActionButton>
                   </div>
                 ) : null}
@@ -1282,35 +1293,37 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>{apiMode === 'real' ? 'Nenhum cliente cadastrado ainda.' : 'Clientes reais aparecem aqui quando o admin estiver conectado ao PostgreSQL.'}</p>
               )}
-            </section>
+            </SectionCard>
+            ) : null}
 
-            <section className="info-block" hidden={activeSection !== 'products'}>
-              <h2>Catalogo admin</h2>
-              <div className="form-block account-form" style={{ marginBottom: 28 }}>
-                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'end' }}>
+            {activeSection === 'products' ? (
+<SectionCard title="Catálogo" description="Gerencie produtos, ative ou desative, edite preços e faça upload de imagens.">
+              <div className="form-block account-form admin-form-gap">
+                <div className="admin-import-grid">
                   <div>
-                    <div className="section-num" style={{ marginBottom: 10 }}>IMPORTAR NUVEMSHOP</div>
-                    <p style={{ marginBottom: 14 }}>Envie o CSV exportado da Nuvemshop para validar nomes, precos, imagens e categorias antes de cadastrar.</p>
+                    <div className="section-num admin-import-label">IMPORTAR NUVEMSHOP</div>
+                    <p className="admin-import-desc">Envie o CSV exportado da Nuvemshop para validar nomes, preços, imagens e categorias antes de cadastrar.</p>
                     <input
                       type="file"
                       accept=".csv,text/csv"
+                      aria-label="Selecionar arquivo CSV da Nuvemshop"
                       disabled={productImportLoading || apiMode !== 'real'}
                       onChange={event => handleProductImportPreview(event.target.files?.[0] ?? null)}
                     />
                   </div>
-                  <div className="meta" style={{ textAlign: 'right' }}>
-                    {productImportLoading ? 'Lendo CSV...' : productImportPreview ? `${productImportPreview.preview.validCount} validos / ${productImportPreview.preview.errorCount} revisar` : 'Preview seguro'}
+                  <div className="meta admin-import-meta">
+                    {productImportLoading ? 'Lendo CSV...' : productImportPreview ? `${productImportPreview.preview.validCount} válidos / ${productImportPreview.preview.errorCount} revisar` : 'Preview seguro'}
                   </div>
                 </div>
-                {productImportError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportError}</p> : null}
-                {productImportSummary ? <p style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productImportSummary}</p> : null}
+                {productImportError ? <p className="admin-error-notice admin-form-gap-xs">{productImportError}</p> : null}
+                {productImportSummary ? <p className="admin-summary-notice">{productImportSummary}</p> : null}
                 {productImportPreview ? (
-                  <div className="summary-items" style={{ marginTop: 18, marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                  <div className="summary-items summary-items-flush admin-import-items">
                     {productImportPreview.preview.validCount > 0 ? (
-                      <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                      <div className="summary-item admin-order-item">
                         <div>
-                          <h5>Importar produtos validos</h5>
-                          <div className="meta">Cria ate 50 produtos por envio. Produtos entram inativos para revisao antes de publicar.</div>
+                          <h5>Importar produtos válidos</h5>
+                          <div className="meta">Cria até 50 produtos por envio. Produtos entram inativos para revisão antes de publicar.</div>
                         </div>
                         <button
                           type="button"
@@ -1318,12 +1331,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           disabled={productImportLoading || apiMode !== 'real'}
                           onClick={handleProductImportCommit}
                         >
-                          {productImportLoading ? 'Importando...' : `Importar ${productImportPreview.preview.validCount} validos`}
+                          {productImportLoading ? 'Importando...' : `Importar ${productImportPreview.preview.validCount} válidos`}
                         </button>
                       </div>
                     ) : null}
                     {productImportPreview.preview.rows.slice(0, 6).map(row => (
-                      <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={`${row.rowNumber}-${row.product.id ?? row.product.name}`}>
+                      <div className="summary-item admin-order-item" key={`${row.rowNumber}-${row.product.id ?? row.product.name}`}>
                         <div>
                           <h5>Linha {row.rowNumber}: {row.product.name || 'Produto sem nome'}</h5>
                           <div className="meta">
@@ -1342,16 +1355,16 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                             setProductError('');
                           }}
                         >
-                          Usar no formulario
+                          Usar no formulário
                         </button>
                       </div>
                     ))}
-                    {productImportPreview.preview.truncated ? <p className="meta">Preview limitado para manter o painel rapido. Importe por lotes menores se necessario.</p> : null}
+                    {productImportPreview.preview.truncated ? <p className="meta">Preview limitado para manter o painel rápido. Importe por lotes menores se necessário.</p> : null}
                   </div>
                 ) : null}
               </div>
-              <form className="form-block account-form" onSubmit={handleProductSubmit} style={{ marginBottom: 28 }}>
-                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+              <form className="form-block account-form admin-form-gap" onSubmit={handleProductSubmit}>
+                <div className="admin-product-fields">
                   <div className="field">
                     <label htmlFor="admin-product-id">ID</label>
                     <input
@@ -1378,9 +1391,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                       value={productForm.category}
                       onChange={event => setProductForm(current => ({ ...current, category: event.target.value }))}
                     >
-                      <option value="sneakers">Tenis</option>
-                      <option value="apparel">Vestuario</option>
-                      <option value="accessories">Acessorios</option>
+                      <option value="sneakers">Tênis</option>
+                      <option value="apparel">Vestuário</option>
+                      <option value="accessories">Acessórios</option>
                     </select>
                   </div>
                   <div className="field">
@@ -1402,7 +1415,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="admin-product-price">Preco</label>
+                    <label htmlFor="admin-product-price">Preço</label>
                     <input
                       id="admin-product-price"
                       type="number"
@@ -1414,7 +1427,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="admin-product-old-price">Preco antigo</label>
+                    <label htmlFor="admin-product-old-price">Preço antigo</label>
                     <input
                       id="admin-product-old-price"
                       type="number"
@@ -1446,9 +1459,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
+                      aria-label="Fazer upload de imagem do produto"
+                      className="admin-upload-input"
                       disabled={productUploading || apiMode !== 'real'}
                       onChange={event => handleProductImageUpload(event.target.files?.[0] ?? null)}
-                      style={{ marginTop: 8 }}
                     />
                     {productUploading ? <span className="meta">Enviando imagem...</span> : null}
                   </div>
@@ -1498,7 +1512,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     />
                   </div>
                 </div>
-                <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                <label className="admin-product-checkbox">
                   <input
                     type="checkbox"
                     checked={productForm.active}
@@ -1506,9 +1520,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   />
                   Produto ativo na loja
                 </label>
-                {productError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{productError}</p> : null}
-                {apiMode !== 'real' ? <p className="meta" style={{ marginTop: 12 }}>Entre como ADMIN real para salvar produtos no PostgreSQL.</p> : null}
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
+                {productError ? <p className="admin-error-notice admin-form-gap-xs">{productError}</p> : null}
+                {apiMode !== 'real' ? <p className="meta admin-form-gap-xs">Entre como ADMIN real para salvar produtos no PostgreSQL.</p> : null}
+                <div className="admin-form-actions">
                   <button type="submit" className="btn btn-primary" disabled={productSaving || apiMode !== 'real'}>
                     {productSaving ? 'Salvando...' : editingProductId ? 'Salvar produto' : 'Criar produto'}
                   </button>
@@ -1522,13 +1536,13 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         setProductError('');
                       }}
                     >
-                      Cancelar edicao
+                      Cancelar edição
                     </button>
                   ) : null}
                 </div>
               </form>
-              <div className="form-block account-form" style={{ marginBottom: 18 }}>
-                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) minmax(160px, 220px)' }}>
+              <div className="form-block account-form admin-form-gap-sm">
+                <div className="admin-search-grid">
                   <div className="field">
                     <label htmlFor="admin-product-search">Buscar produto</label>
                     <input
@@ -1553,9 +1567,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                 </div>
                 <p className="meta">{filteredAdminProducts.length} produto(s) filtrado(s) de {adminProducts.length} cadastrados.</p>
               </div>
-              <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+              <div className="summary-items summary-items-flush">
                 {visibleAdminProducts.map(product => (
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={product.id}>
+                  <div className="summary-item admin-order-item" key={product.id}>
                     <div className="admin-product-row">
                       <span
                         className="admin-product-thumb"
@@ -1567,7 +1581,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                       <div className="meta">{product.brand} · {product.category}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div className="admin-order-actions">
                       <StatusBadge tone={product.active ? 'success' : 'neutral'}>
                         {product.active ? 'Ativo' : 'Inativo'}
                       </StatusBadge>
@@ -1602,7 +1616,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                 ) : null}
               </div>
               {productPageCount > 1 ? (
-                <div className="account-pagination" aria-label="Paginacao de produtos do admin">
+                <div className="account-pagination" aria-label="Paginação de produtos do admin">
                   <ActionButton
                     type="button"
                     tone="secondary"
@@ -1611,73 +1625,75 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   >
                     Anterior
                   </ActionButton>
-                  <span>Pagina {productPage} de {productPageCount}</span>
+                  <span>Página {productPage} de {productPageCount}</span>
                   <ActionButton
                     type="button"
                     tone="secondary"
                     disabled={productPage >= productPageCount}
                     onClick={() => setProductPage(page => Math.min(productPageCount, page + 1))}
                   >
-                    Proxima
+                    Próxima
                   </ActionButton>
                 </div>
               ) : null}
-            </section>
+</SectionCard>
+) : null}
 
-            <section className="info-block" hidden={!['overview', 'settings'].includes(activeSection)}>
-              <h2>Operacao da loja</h2>
+            {['overview', 'settings'].includes(activeSection) ? (
+<SectionCard title="Operação da loja" description="Status das integrações e configurações ativas no backend.">
               {adminSettings ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                <div className="summary-items summary-items-flush">
+                  <div className="summary-item admin-settings-item">
                     <h5>Marca</h5>
                     <div className="meta">{adminSettings.store.appName} - {adminSettings.store.publicUrl}</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="summary-item admin-settings-item">
                     <h5>Contato</h5>
-                    <div className="meta">{adminSettings.store.supportEmail} - {adminSettings.store.whatsapp || 'WhatsApp nao configurado'}</div>
+                    <div className="meta">{adminSettings.store.supportEmail} - {adminSettings.store.whatsapp || 'WhatsApp não configurado'}</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="summary-item admin-settings-item">
                     <h5>Mercado Pago</h5>
-                    <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'producao'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
+                    <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'produção'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="summary-item admin-settings-item">
                     <h5>Email</h5>
                     <div className="meta">{adminSettings.integrations.email.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.email.devMode ? 'modo dev' : 'envio real'} {adminSettings.integrations.email.user ? `- ${adminSettings.integrations.email.user}` : ''}</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="summary-item admin-settings-item">
                     <h5>Melhor Envio</h5>
                     <div className="meta">{adminSettings.integrations.melhorEnvio.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.melhorEnvio.env} - CEP origem {adminSettings.integrations.melhorEnvio.originCepConfigured ? 'ok' : 'pendente'}</div>
                   </div>
                 </div>
               ) : (
-                <p>Configuracoes reais aparecem aqui quando o admin estiver conectado ao backend.</p>
+                <p>Configurações reais aparecem aqui quando o admin estiver conectado ao backend.</p>
               )}
-            </section>
+</SectionCard>
+) : null}
 
-            <section className="info-block" hidden={activeSection !== 'payments'}>
-              <h2>Pagamentos</h2>
+            {activeSection === 'payments' ? (
+<SectionCard title="Pagamentos" description="Status do Mercado Pago, volume de pagamentos e ticket médio.">
               {adminSettings ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                <div className="summary-items summary-items-flush">
+                  <div className="summary-item admin-order-item">
                     <div>
                       <h5>Mercado Pago</h5>
-                      <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'producao real'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
+                      <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'produção real'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
                     </div>
-                    <span className={`order-status ${adminSettings.integrations.mercadoPago.configured ? 'status-paid' : 'status-pending'}`}>
+                    <StatusBadge tone={adminSettings.integrations.mercadoPago.configured ? 'success' : 'warning'}>
                       {adminSettings.integrations.mercadoPago.configured ? 'OK' : 'PENDENTE'}
-                    </span>
+                    </StatusBadge>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                  <div className="summary-item admin-order-item">
                     <div>
                       <h5>Pedidos pagos</h5>
                       <div className="meta">{totals.paid} aprovados - {totals.pending} aguardando pagamento</div>
                     </div>
                     <div className="price">{formatPrice(totals.revenue)}</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                  <div className="summary-item admin-order-item">
                     <div>
-                      <h5>Ticket medio</h5>
-                      <div className="meta">Media simples dos pedidos carregados no painel</div>
+                      <h5>Ticket médio</h5>
+                      <div className="meta">Média simples dos pedidos carregados no painel</div>
                     </div>
                     <div className="price">{formatPrice(totals.averageTicket)}</div>
                   </div>
@@ -1685,61 +1701,63 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>Conecte o admin real para ver o estado do Mercado Pago.</p>
               )}
-            </section>
+</SectionCard>
+) : null}
 
-            <section className="info-block" hidden={activeSection !== 'shipping'}>
-              <h2>Frete</h2>
+            {activeSection === 'shipping' ? (
+<SectionCard title="Frete" description="Status do Melhor Envio, pedidos enviados e política de frete.">
               {adminSettings ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                <div className="summary-items summary-items-flush">
+                  <div className="summary-item admin-order-item">
                     <div>
                       <h5>Melhor Envio</h5>
                       <div className="meta">{adminSettings.integrations.melhorEnvio.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - ambiente {adminSettings.integrations.melhorEnvio.env} - CEP origem {adminSettings.integrations.melhorEnvio.originCepConfigured ? 'ok' : 'pendente'}</div>
                     </div>
-                    <span className={`order-status ${adminSettings.integrations.melhorEnvio.configured ? 'status-paid' : 'status-pending'}`}>
+                    <StatusBadge tone={adminSettings.integrations.melhorEnvio.configured ? 'success' : 'warning'}>
                       {adminSettings.integrations.melhorEnvio.configured ? 'OK' : 'PENDENTE'}
-                    </span>
+                    </StatusBadge>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                  <div className="summary-item admin-order-item">
                     <div>
                       <h5>Pedidos enviados</h5>
-                      <div className="meta">Separacao, envio e entrega registrados no status do pedido</div>
+                      <div className="meta">Separação, envio e entrega registrados no status do pedido</div>
                     </div>
                     <div className="price">{totals.shipped}</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                    <h5>Politica atual</h5>
-                    <div className="meta">Cotacao real no checkout, servicos filtrados e markup configuravel no backend.</div>
+                  <div className="summary-item admin-settings-item">
+                    <h5>Política atual</h5>
+                    <div className="meta">Cotação real no checkout, serviços filtrados e markup configurável no backend.</div>
                   </div>
                 </div>
               ) : (
                 <p>Conecte o admin real para ver o estado do Melhor Envio.</p>
               )}
-            </section>
+</SectionCard>
+) : null}
 
-            <section className="info-block" hidden={activeSection !== 'logs'}>
-              <h2>Logs e auditoria</h2>
+            {activeSection === 'logs' ? (
+<SectionCard title="Logs e auditoria" description="Registro de todas as ações administrativas.">
               {adminAuditLogs.length ? (
                 <>
                 <div className="account-list-tools" aria-label="Filtros de auditoria do admin">
                   <input
                     value={auditLogSearch}
                     onChange={event => setAuditLogSearch(event.target.value)}
-                    placeholder="Buscar por acao, admin, alvo ou ID"
+                    placeholder="Buscar por ação, admin, alvo ou ID"
                     aria-label="Buscar logs de auditoria"
                   />
                 </div>
                 {visibleAuditLogs.length ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {visibleAuditLogs.map(log => (
-                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={log.id}>
+                    <div className="summary-item admin-order-item" key={log.id}>
                       <div>
                         <h5>{log.action}</h5>
                         <div className="meta">
                           {log.targetType || 'registro'} {log.targetId ? `- ${log.targetId}` : ''} - {log.adminEmail || log.adminUserId || 'admin'} - {new Date(log.timestamp).toLocaleString('pt-BR')}
                         </div>
                       </div>
-                      <span className="order-status status-delivered">AUDIT</span>
+                      <StatusBadge tone="info">AUDIT</StatusBadge>
                     </div>
                   ))}
                 </div>
@@ -1750,7 +1768,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   />
                 )}
                 {auditLogPageCount > 1 ? (
-                  <div className="account-pagination" aria-label="Paginacao de logs do admin">
+                  <div className="account-pagination" aria-label="Paginação de logs do admin">
                     <ActionButton
                       type="button"
                       tone="secondary"
@@ -1759,38 +1777,39 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     >
                       Anterior
                     </ActionButton>
-                    <span>Pagina {auditLogPage} de {auditLogPageCount}</span>
+                    <span>Página {auditLogPage} de {auditLogPageCount}</span>
                     <ActionButton
                       type="button"
                       tone="secondary"
                       disabled={auditLogPage >= auditLogPageCount}
                       onClick={() => setAuditLogPage(page => Math.min(auditLogPageCount, page + 1))}
                     >
-                      Proxima
+                      Próxima
                     </ActionButton>
                   </div>
                 ) : null}
                 </>
               ) : (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
+                <div className="summary-items summary-items-flush">
+                  <div className="summary-item admin-settings-item">
                     <h5>Nenhum log carregado</h5>
-                    <div className="meta">Quando voce alterar pedido, produto, cupom, usuario ou newsletter, o registro aparece aqui.</div>
+                    <div className="meta">Quando você alterar pedido, produto, cupom, usuário ou newsletter, o registro aparece aqui.</div>
                   </div>
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr' }}>
-                    <h5>Seguranca</h5>
-                    <div className="meta">RequireAdmin, rate limit administrativo e sessoes HttpOnly permanecem ativos.</div>
+                  <div className="summary-item admin-settings-item">
+                    <h5>Segurança</h5>
+                    <div className="meta">RequireAdmin, rate limit administrativo e sessões HttpOnly permanecem ativos.</div>
                   </div>
                 </div>
               )}
-            </section>
+</SectionCard>
+) : null}
 
-            <section className="info-block" hidden={activeSection !== 'coupons'}>
-              <h2>Cupons</h2>
-              <form className="form-block account-form" onSubmit={handleCouponSubmit} style={{ marginBottom: 24 }}>
-                <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+            {activeSection === 'coupons' ? (
+<SectionCard title="Cupons" description="Crie e gerencie cupons de desconto percentual ou fixo.">
+              <form className="form-block account-form admin-form-gap" onSubmit={handleCouponSubmit}>
+                <div className="admin-user-fields">
                   <div className="field">
-                    <label htmlFor="admin-coupon-code">Codigo</label>
+                    <label htmlFor="admin-coupon-code">Código</label>
                     <input id="admin-coupon-code" value={couponForm.code} onChange={event => setCouponForm(current => ({ ...current, code: event.target.value }))} required />
                   </div>
                   <div className="field">
@@ -1809,12 +1828,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     <input id="admin-coupon-limit" type="number" min="1" value={couponForm.maxRedemptions} onChange={event => setCouponForm(current => ({ ...current, maxRedemptions: event.target.value }))} />
                   </div>
                 </div>
-                <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16, fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                <label className="admin-product-checkbox">
                   <input type="checkbox" checked={couponForm.active} onChange={event => setCouponForm(current => ({ ...current, active: event.target.checked }))} />
                   Cupom ativo
                 </label>
-                {couponError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 12 }}>{couponError}</p> : null}
-                <button type="submit" className="btn btn-primary" style={{ marginTop: 18 }} disabled={couponSaving || apiMode !== 'real'}>
+                {couponError ? <p className="admin-error-notice admin-form-gap-xs">{couponError}</p> : null}
+                <button type="submit" className="btn btn-primary admin-coupon-submit" disabled={couponSaving || apiMode !== 'real'}>
                   {couponSaving ? 'Salvando...' : 'Criar cupom'}
                 </button>
               </form>
@@ -1822,7 +1841,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                 <input
                   value={couponSearch}
                   onChange={event => setCouponSearch(event.target.value)}
-                  placeholder="Buscar cupom por codigo ou tipo"
+                  placeholder="Buscar cupom por código ou tipo"
                   aria-label="Buscar cupons"
                 />
                 <select
@@ -1835,14 +1854,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   <option value="inactive">Inativos</option>
                 </select>
               </div>
-              <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+              <div className="summary-items summary-items-flush">
                 {filteredAdminCoupons.slice(0, 12).map(coupon => (
-                  <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={coupon.id}>
+                  <div className="summary-item admin-order-item" key={coupon.id}>
                     <div>
                       <h5>{coupon.code}</h5>
                       <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div className="admin-order-actions">
                       <StatusBadge tone={coupon.active ? 'success' : 'neutral'}>{coupon.active ? 'Ativo' : 'Inativo'}</StatusBadge>
                       <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
                         {coupon.active ? 'Desativar' : 'Ativar'}
@@ -1857,10 +1876,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   />
                 ) : null}
               </div>
-            </section>
+</SectionCard>
+) : null}
 
-            <section className="info-block" hidden={activeSection !== 'newsletter'}>
-              <h2>Newsletter</h2>
+            {activeSection === 'newsletter' ? (
+<SectionCard title="Newsletter" description="Gerencie inscritos e visualize origem das assinaturas.">
               {newsletterSubscribers.length ? (
                 <>
                 <div className="account-list-tools" aria-label="Filtros de newsletter">
@@ -1880,14 +1900,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     <option value="inactive">Inativos</option>
                   </select>
                 </div>
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {filteredNewsletterSubscribers.slice(0, 12).map(subscriber => (
-                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={subscriber.id}>
+                    <div className="summary-item admin-order-item" key={subscriber.id}>
                       <div>
                         <h5>{subscriber.email}</h5>
                         <div className="meta">{subscriber.source} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <div className="admin-order-actions">
                         <StatusBadge tone={subscriber.isActive ? 'success' : 'neutral'}>{subscriber.isActive ? 'Ativo' : 'Inativo'}</StatusBadge>
                         <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
                           {subscriber.isActive ? 'Desativar' : 'Ativar'}
@@ -1906,7 +1926,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>Nenhum inscrito na newsletter ainda.</p>
               )}
-            </section>
+</SectionCard>
+) : null}
           </article>
         </section>
       </div>
