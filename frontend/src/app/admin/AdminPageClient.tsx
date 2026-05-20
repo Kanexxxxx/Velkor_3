@@ -229,6 +229,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [customerPage, setCustomerPage] = useState(1);
   const [auditLogSearch, setAuditLogSearch] = useState('');
   const [auditLogPage, setAuditLogPage] = useState(1);
+  const [couponSearch, setCouponSearch] = useState('');
+  const [couponStatusFilter, setCouponStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [newsletterSearch, setNewsletterSearch] = useState('');
+  const [newsletterStatusFilter, setNewsletterStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userSavingId, setUserSavingId] = useState<string | null>(null);
   const [userError, setUserError] = useState('');
   const [couponSaving, setCouponSaving] = useState(false);
@@ -499,6 +503,36 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   useEffect(() => {
     setAuditLogPage(1);
   }, [adminAuditLogs.length, auditLogSearch]);
+
+  const filteredAdminCoupons = useMemo(() => {
+    const query = couponSearch.trim().toLowerCase();
+    return adminCoupons.filter(coupon => {
+      const matchesStatus = couponStatusFilter === 'all'
+        || (couponStatusFilter === 'active' && coupon.active)
+        || (couponStatusFilter === 'inactive' && !coupon.active);
+      const matchesQuery = !query || [
+        coupon.code,
+        coupon.discountType,
+        coupon.discountValue,
+        coupon.redeemedCount,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [adminCoupons, couponSearch, couponStatusFilter]);
+
+  const filteredNewsletterSubscribers = useMemo(() => {
+    const query = newsletterSearch.trim().toLowerCase();
+    return newsletterSubscribers.filter(subscriber => {
+      const matchesStatus = newsletterStatusFilter === 'all'
+        || (newsletterStatusFilter === 'active' && subscriber.isActive)
+        || (newsletterStatusFilter === 'inactive' && !subscriber.isActive);
+      const matchesQuery = !query || [
+        subscriber.email,
+        subscriber.source,
+      ].some(value => String(value || '').toLowerCase().includes(query));
+      return matchesStatus && matchesQuery;
+    });
+  }, [newsletterSearch, newsletterStatusFilter, newsletterSubscribers]);
 
   async function handleProductSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1675,37 +1709,91 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   {couponSaving ? 'Salvando...' : 'Criar cupom'}
                 </button>
               </form>
+              <div className="account-list-tools" aria-label="Filtros de cupons">
+                <input
+                  value={couponSearch}
+                  onChange={event => setCouponSearch(event.target.value)}
+                  placeholder="Buscar cupom por codigo ou tipo"
+                  aria-label="Buscar cupons"
+                />
+                <select
+                  value={couponStatusFilter}
+                  onChange={event => setCouponStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                  aria-label="Filtrar cupons por status"
+                >
+                  <option value="all">Todos</option>
+                  <option value="active">Ativos</option>
+                  <option value="inactive">Inativos</option>
+                </select>
+              </div>
               <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                {adminCoupons.slice(0, 8).map(coupon => (
+                {filteredAdminCoupons.slice(0, 12).map(coupon => (
                   <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={coupon.id}>
                     <div>
                       <h5>{coupon.code}</h5>
-                      <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos - {coupon.active ? 'ativo' : 'inativo'}</div>
+                      <div className="meta">{coupon.discountType === 'PERCENT' ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue / 100)} - {coupon.redeemedCount} usos</div>
                     </div>
-                    <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
-                      {coupon.active ? 'Desativar' : 'Ativar'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <StatusBadge tone={coupon.active ? 'success' : 'neutral'}>{coupon.active ? 'Ativo' : 'Inativo'}</StatusBadge>
+                      <button type="button" className="btn btn-secondary" onClick={() => toggleCoupon(coupon)} disabled={couponSaving || apiMode !== 'real'}>
+                        {coupon.active ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
                   </div>
                 ))}
+                {filteredAdminCoupons.length === 0 ? (
+                  <EmptyState
+                    title="Nenhum cupom encontrado"
+                    description="Ajuste a busca ou o status para revisar outros cupons."
+                  />
+                ) : null}
               </div>
             </section>
 
             <section className="info-block" hidden={activeSection !== 'newsletter'}>
               <h2>Newsletter</h2>
               {newsletterSubscribers.length ? (
+                <>
+                <div className="account-list-tools" aria-label="Filtros de newsletter">
+                  <input
+                    value={newsletterSearch}
+                    onChange={event => setNewsletterSearch(event.target.value)}
+                    placeholder="Buscar inscrito por email ou origem"
+                    aria-label="Buscar inscritos da newsletter"
+                  />
+                  <select
+                    value={newsletterStatusFilter}
+                    onChange={event => setNewsletterStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                    aria-label="Filtrar inscritos por status"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="active">Ativos</option>
+                    <option value="inactive">Inativos</option>
+                  </select>
+                </div>
                 <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
-                  {newsletterSubscribers.slice(0, 10).map(subscriber => (
+                  {filteredNewsletterSubscribers.slice(0, 12).map(subscriber => (
                     <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={subscriber.id}>
                       <div>
                         <h5>{subscriber.email}</h5>
-                        <div className="meta">{subscriber.source} - {subscriber.isActive ? 'ativo' : 'inativo'} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
+                        <div className="meta">{subscriber.source} - {new Date(subscriber.subscribedAt).toLocaleDateString('pt-BR')}</div>
                       </div>
-                      <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
-                        {subscriber.isActive ? 'Desativar' : 'Ativar'}
-                      </button>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <StatusBadge tone={subscriber.isActive ? 'success' : 'neutral'}>{subscriber.isActive ? 'Ativo' : 'Inativo'}</StatusBadge>
+                        <button type="button" className="btn btn-secondary" onClick={() => toggleNewsletter(subscriber)} disabled={newsletterSavingId === subscriber.id || apiMode !== 'real'}>
+                          {subscriber.isActive ? 'Desativar' : 'Ativar'}
+                        </button>
+                      </div>
                     </div>
                   ))}
+                  {filteredNewsletterSubscribers.length === 0 ? (
+                    <EmptyState
+                      title="Nenhum inscrito encontrado"
+                      description="Ajuste a busca ou o status para revisar outros inscritos."
+                    />
+                  ) : null}
                 </div>
+                </>
               ) : (
                 <p>Nenhum inscrito na newsletter ainda.</p>
               )}
