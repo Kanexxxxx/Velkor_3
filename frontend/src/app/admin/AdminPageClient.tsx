@@ -356,7 +356,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setAdminSettings(null);
       setAdminAuditLogs([]);
       setApiMode('demo');
-      setError('Nao foi possivel atualizar dados reais agora. Exibindo fallback demo.');
+      setError('Não foi possível atualizar dados reais agora. Exibindo fallback demo.');
     } finally {
       setLoading(false);
     }
@@ -560,7 +560,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setProductForm(emptyProductForm);
       setEditingProductId(null);
     } catch (err) {
-      setProductError(err instanceof Error ? err.message : 'Nao foi possivel salvar produto.');
+      setProductError(err instanceof Error ? err.message : 'Não foi possível salvar produto.');
     } finally {
       setProductSaving(false);
     }
@@ -574,7 +574,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Nao foi possivel ler a imagem.'));
+        reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
         reader.readAsDataURL(file);
       });
       const uploaded = await uploadAdminProductImage({ filename: file.name, dataUrl });
@@ -585,7 +585,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         images: current.images ? `${current.images}, ${imageUrl}` : imageUrl,
       }));
     } catch (err) {
-      setProductError(err instanceof Error ? err.message : 'Nao foi possivel enviar imagem.');
+      setProductError(err instanceof Error ? err.message : 'Não foi possível enviar imagem.');
     } finally {
       setProductUploading(false);
     }
@@ -602,7 +602,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const csv = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Nao foi possivel ler o CSV.'));
+        reader.onerror = () => reject(new Error('Não foi possível ler o CSV.'));
         reader.readAsText(file, 'utf-8');
       });
       const preview = await previewAdminProductImport({ filename: file.name, csv });
@@ -611,7 +611,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const firstValid = preview.preview.rows.find(row => row.status === 'valid');
       if (firstValid) setProductForm(importRowToForm(firstValid.product));
     } catch (err) {
-      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel analisar o CSV.');
+      setProductImportError(err instanceof Error ? err.message : 'Não foi possível analisar o CSV.');
     } finally {
       setProductImportLoading(false);
     }
@@ -624,7 +624,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     setProductImportSummary('');
     try {
       const result = await importAdminProducts(productImportFile);
-      setProductImportSummary(`${result.createdCount} produto(s) importado(s). ${result.failedCount} linha(s) exigem revisao.`);
+      setProductImportSummary(`${result.createdCount} produto(s) importado(s). ${result.failedCount} linha(s) exigem revisão.`);
       const createdProducts = result.results
         .filter(row => row.status === 'created')
         .map(row => row.product)
@@ -637,7 +637,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         });
       }
     } catch (err) {
-      setProductImportError(err instanceof Error ? err.message : 'Nao foi possivel importar o CSV.');
+      setProductImportError(err instanceof Error ? err.message : 'Não foi possível importar o CSV.');
     } finally {
       setProductImportLoading(false);
     }
@@ -650,7 +650,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateAdminProduct(product.id, { active: !product.active });
       setAdminProducts(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setProductError(err instanceof Error ? err.message : 'Nao foi possivel atualizar produto.');
+      setProductError(err instanceof Error ? err.message : 'Não foi possível atualizar produto.');
     } finally {
       setProductSaving(false);
     }
@@ -664,7 +664,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateAdminOrderStatus(order.id, status);
       setOrders(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar pedido.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar pedido.');
     } finally {
       setOrderSavingId(null);
     }
@@ -676,10 +676,10 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     try {
       const result = await resendAdminOrderConfirmation(order.id);
       setError(result.email?.sent === false
-        ? 'Email nao enviado. Confira SMTP e logs.'
-        : 'Confirmacao do pedido reenviada para o cliente.');
+        ? 'Email não enviado. Confira SMTP e logs.'
+        : 'Confirmação do pedido reenviada para o cliente.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a confirmacao.');
+      setError(err instanceof Error ? err.message : 'Não foi possível reenviar a confirmação.');
     } finally {
       setOrderEmailSendingId(null);
     }
@@ -700,7 +700,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         ? 'Pedido marcado como enviado, mas o email de envio falhou.'
         : 'Pedido marcado como enviado e email de rastreio disparado.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar o envio.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar o envio.');
     } finally {
       setOrderShippingSavingId(null);
     }
@@ -730,7 +730,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         },
       }));
     } catch (err) {
-      setUserError(err instanceof Error ? err.message : 'Nao foi possivel salvar cliente.');
+      setUserError(err instanceof Error ? err.message : 'Não foi possível salvar cliente.');
     } finally {
       setUserSavingId(null);
     }
@@ -745,11 +745,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         setUserError('Este cliente ja esta com email verificado.');
       } else {
         setUserError(result.email?.sent === false
-          ? 'Email de verificacao nao enviado. Confira SMTP e logs.'
-          : 'Verificacao reenviada para o cliente.');
+          ? 'Email de verificação não enviado. Confira SMTP e logs.'
+          : 'Verificação reenviada para o cliente.');
       }
     } catch (err) {
-      setUserError(err instanceof Error ? err.message : 'Nao foi possivel reenviar a verificacao.');
+      setUserError(err instanceof Error ? err.message : 'Não foi possível reenviar a verificação.');
     } finally {
       setUserVerificationSendingId(null);
     }
@@ -764,7 +764,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       setAdminCoupons(current => [saved, ...current.filter(coupon => coupon.id !== saved.id)]);
       setCouponForm(emptyCouponForm);
     } catch (err) {
-      setCouponError(err instanceof Error ? err.message : 'Nao foi possivel salvar cupom.');
+      setCouponError(err instanceof Error ? err.message : 'Não foi possível salvar cupom.');
     } finally {
       setCouponSaving(false);
     }
@@ -777,7 +777,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateAdminCoupon(coupon.id, { ...coupon, active: !coupon.active });
       setAdminCoupons(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setCouponError(err instanceof Error ? err.message : 'Nao foi possivel atualizar cupom.');
+      setCouponError(err instanceof Error ? err.message : 'Não foi possível atualizar cupom.');
     } finally {
       setCouponSaving(false);
     }
@@ -790,7 +790,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
       const saved = await updateNewsletterSubscriber(subscriber.id, { isActive: !subscriber.isActive });
       setNewsletterSubscribers(current => current.map(item => item.id === saved.id ? saved : item));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar newsletter.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar newsletter.');
     } finally {
       setNewsletterSavingId(null);
     }
@@ -799,11 +799,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   if (checkingAdmin) {
     return (
       <main className="info-page">
-        <div className="container" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
-            <div className="section-num" style={{ marginBottom: 12 }}>PAINEL ADMIN</div>
-            <h1 style={{ marginBottom: 16 }}>Validando <span className="red">acesso.</span></h1>
-            <p>Conferindo sessao administrativa...</p>
+        <div className="container admin-gate-wrap">
+          <div className="admin-gate-inner">
+            <div className="section-num admin-gate-eyebrow">PAINEL ADMIN</div>
+            <h1 className="admin-gate-title">Validando <span className="red">acesso.</span></h1>
+            <p>Conferindo sessão administrativa...</p>
           </div>
         </div>
       </main>
@@ -834,12 +834,12 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
 
     return (
       <main className="info-page">
-        <div className="container" style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
-            <div className="section-num" style={{ marginBottom: 12 }}>PAINEL ADMIN</div>
-            <h1 style={{ marginBottom: 24 }}>Acesso <span className="red">Restrito.</span></h1>
-            <p style={{ marginBottom: 24 }}>Entre com uma conta ADMIN. O acesso legado por senha permanece temporario para rollback.</p>
-            <form onSubmit={handleUnlock} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="container admin-gate-wrap">
+          <div className="admin-gate-inner">
+            <div className="section-num admin-gate-eyebrow">PAINEL ADMIN</div>
+            <h1 className="admin-gate-title--unlock">Acesso <span className="red">Restrito.</span></h1>
+            <p className="admin-gate-desc">Entre com uma conta ADMIN. O acesso legado por senha permanece temporario para rollback.</p>
+            <form onSubmit={handleUnlock} className="admin-gate-form">
               <div className="field">
                 <label htmlFor="admin-password">Senha de acesso legado</label>
                 <input
@@ -852,8 +852,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   required
                 />
               </div>
-              {error ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{error}</p> : null}
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
+              {error ? <p className="admin-gate-error">{error}</p> : null}
+              <button type="submit" className="btn btn-primary admin-gate-submit" disabled={loading}>
                 {loading ? 'Verificando...' : 'Entrar'}
               </button>
             </form>
@@ -875,7 +875,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
         <PageHeader
           eyebrow="PAINEL ADMIN"
           title={<>Controle <span className="red">Velkor.</span></>}
-          description={apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}
+          description={apiMode === 'real' ? 'Dados administrativos carregados com sessão real protegida.' : 'Fallback administrativo temporario para validação e rollback controlado.'}
           actions={(
             <>
               <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode}</StatusBadge>
@@ -891,7 +891,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
           <div>
             <div className="section-num">PAINEL ADMIN</div>
             <h1>Controle <span className="red">Velkor.</span></h1>
-            <p>{apiMode === 'real' ? 'Dados administrativos carregados com sessao real protegida.' : 'Fallback administrativo temporario para validacao e rollback controlado.'}</p>
+            <p>{apiMode === 'real' ? 'Dados administrativos carregados com sessão real protegida.' : 'Fallback administrativo temporario para validação e rollback controlado.'}</p>
           </div>
           <div className="admin-legacy-actions">
             <button type="button" className="btn btn-secondary" onClick={refreshAdminData} disabled={loading}>
@@ -1165,7 +1165,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   <select
                     value={customerEmailFilter}
                     onChange={event => setCustomerEmailFilter(event.target.value as 'all' | 'verified' | 'pending')}
-                    aria-label="Filtrar verificacao de email"
+                    aria-label="Filtrar verificação de email"
                   >
                     <option value="all">Todos emails</option>
                     <option value="verified">Verificados</option>
@@ -1415,7 +1415,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="admin-product-price">Preco</label>
+                    <label htmlFor="admin-product-price">Preço</label>
                     <input
                       id="admin-product-price"
                       type="number"
@@ -1427,7 +1427,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="admin-product-old-price">Preco antigo</label>
+                    <label htmlFor="admin-product-old-price">Preço antigo</label>
                     <input
                       id="admin-product-old-price"
                       type="number"

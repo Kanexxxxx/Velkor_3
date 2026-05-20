@@ -3573,7 +3573,13 @@ code {
   background: var(--surface);
   border-radius: 8px;
 }
-.op-section-card { padding: 24px; }
+.op-section-card {
+  padding: 24px;
+  transition: border-color 0.2s var(--ease);
+}
+.op-section-card:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+}
 .op-section-card-header {
   display: flex;
   justify-content: space-between;
@@ -3883,12 +3889,44 @@ code {
   .op-action { width: 100%; }
 }
 
-/* Operational component polish */
-.op-section-card {
-  transition: border-color 0.2s var(--ease);
+/* Admin check / unlock gate screens */
+.admin-gate-wrap {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.op-section-card:hover {
-  border-color: rgba(255, 255, 255, 0.08);
+.admin-gate-inner {
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+}
+.admin-gate-eyebrow {
+  margin-bottom: 12px;
+}
+.admin-gate-title {
+  margin-bottom: 16px;
+}
+.admin-gate-title--unlock {
+  margin-bottom: 24px;
+}
+.admin-gate-desc {
+  margin-bottom: 24px;
+}
+.admin-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-gate-error {
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 0;
+}
+.admin-gate-submit {
+  width: 100%;
+  justify-content: center;
 }
 /* Admin error state */
 .admin-error-notice {
