@@ -1010,8 +1010,16 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
             </SectionCard>
             ) : null}
 
-            <section className="info-block" hidden={!['overview', 'orders'].includes(activeSection)}>
-              <h2>Pedidos recentes</h2>
+            {['overview', 'orders'].includes(activeSection) ? (
+            <SectionCard
+              title="Pedidos recentes"
+              description="Acompanhe, filtre e atualize o status de todos os pedidos da loja."
+              actions={
+                <span className="admin-section-count">
+                  {orders.length} pedido(s)
+                </span>
+              }
+            >
               {orders.length ? (
                 <>
                 <div className="account-list-tools" aria-label="Filtros de pedidos do admin">
@@ -1034,16 +1042,16 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </select>
                 </div>
                 {visibleAdminOrders.length ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {visibleAdminOrders.map(order => (
-                    <div className="summary-item" style={{ gridTemplateColumns: '1fr auto' }} key={order.id}>
+                    <div className="summary-item admin-order-item" key={order.id}>
                       <div>
                         <h5>{order.id}</h5>
                         <div className="admin-order-context">
                           <span>{order.contact?.name || 'Cliente sem nome'}</span>
-                          <span>{order.contact?.email || 'email nao informado'}</span>
+                          <span>{order.contact?.email || 'email não informado'}</span>
                           <span>{order.items.length} item(ns)</span>
-                          <span>{order.shipping || 'frete nao informado'} - {formatPrice(order.shippingCost)}</span>
+                          <span>{order.shipping || 'frete não informado'} - {formatPrice(order.shippingCost)}</span>
                         </div>
                         <div className="admin-order-context">
                           <span>{order.address?.city || 'cidade n/a'}{order.address?.region ? `/${order.address.region}` : ''}</span>
@@ -1079,9 +1087,9 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         <input
                           value={orderTrackingDrafts[order.id] ?? order.trackingCode ?? ''}
                           onChange={event => setOrderTrackingDrafts(current => ({ ...current, [order.id]: event.target.value }))}
-                          placeholder="Codigo de rastreio"
-                          aria-label={`Codigo de rastreio do pedido ${order.id}`}
-                          style={{ maxWidth: 180 }}
+                          placeholder="Código de rastreio"
+                          aria-label={`Código de rastreio do pedido ${order.id}`}
+                          className="admin-tracking-input"
                         />
                         <button
                           type="button"
@@ -1112,14 +1120,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     >
                       Anterior
                     </ActionButton>
-                    <span>Pagina {adminOrderPage} de {adminOrderPageCount}</span>
+                    <span>Página {adminOrderPage} de {adminOrderPageCount}</span>
                     <ActionButton
                       type="button"
                       tone="secondary"
                       disabled={adminOrderPage >= adminOrderPageCount}
                       onClick={() => setAdminOrderPage(page => Math.min(adminOrderPageCount, page + 1))}
                     >
-                      Proxima
+                      Próxima
                     </ActionButton>
                   </div>
                 ) : null}
@@ -1127,18 +1135,22 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>Nenhum pedido criado ainda. Finalize um checkout para alimentar este painel.</p>
               )}
-            </section>
+            </SectionCard>
+            ) : null}
 
-            <section className="info-block" hidden={activeSection !== 'customers'}>
-              <h2>Clientes</h2>
-              {userError ? <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 16 }}>{userError}</p> : null}
+            {activeSection === 'customers' ? (
+            <SectionCard
+              title="Clientes"
+              description="Gerencie contas, roles, verificação de email e endereços."
+            >
+              {userError ? <p className="admin-error-notice">{userError}</p> : null}
               {adminUsers.length ? (
                 <>
                 <div className="account-list-tools" aria-label="Filtros de clientes do admin">
                   <input
                     value={customerSearch}
                     onChange={event => setCustomerSearch(event.target.value)}
-                    placeholder="Buscar por nome, email, endereco ou pedido"
+                    placeholder="Buscar por nome, email, endereço ou pedido"
                     aria-label="Buscar clientes"
                   />
                   <select
@@ -1161,24 +1173,24 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   </select>
                 </div>
                 {visibleAdminUsers.length ? (
-                <div className="summary-items" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 0 }}>
+                <div className="summary-items summary-items-flush">
                   {visibleAdminUsers.map(user => {
                     const form = userForms[user.id] ?? { name: user.name ?? '', email: user.email, role: user.role, emailVerified: user.emailVerified };
                     return (
-                      <form className="summary-item" style={{ gridTemplateColumns: '1fr', gap: 16 }} key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
+                      <form className="summary-item admin-user-form" key={user.id} onSubmit={event => handleUserSubmit(event, user)}>
                         <div>
                           <h5>{user.email}</h5>
                           <div className="meta">
-                            {user.name || 'Cliente sem nome'} - {user.orders.length} pedidos - {user.addresses.length} enderecos
+                            {user.name || 'Cliente sem nome'} - {user.orders.length} pedidos - {user.addresses.length} endereços
                           </div>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                          <div className="admin-user-badges">
                             <StatusBadge tone={user.role === 'ADMIN' ? 'warning' : 'neutral'}>{user.role}</StatusBadge>
                             <StatusBadge tone={user.emailVerified ? 'success' : 'warning'}>
                               {user.emailVerified ? 'Email verificado' : 'Email pendente'}
                             </StatusBadge>
                           </div>
                         </div>
-                        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                        <div className="admin-user-fields">
                           <div className="field">
                             <label htmlFor={`admin-user-name-${user.id}`}>Nome</label>
                             <input
@@ -1209,7 +1221,7 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                             </select>
                           </div>
                         </div>
-                        <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' }}>
+                        <label className="admin-user-checkbox-label">
                           <input
                             type="checkbox"
                             checked={form.emailVerified}
@@ -1219,17 +1231,17 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                         </label>
                         {user.addresses.length ? (
                           <div>
-                            <div className="meta" style={{ marginBottom: 8 }}>Enderecos</div>
+                            <div className="meta admin-user-section-label">Endereços</div>
                             {user.addresses.slice(0, 3).map(address => (
-                              <p key={address.id} style={{ marginBottom: 6 }}>{address.recipient} - {address.street} - {address.city}/{address.region} - {address.postalCode}</p>
+                              <p key={address.id} className="admin-user-detail-row">{address.recipient} - {address.street} - {address.city}/{address.region} - {address.postalCode}</p>
                             ))}
                           </div>
                         ) : null}
                         {user.orders.length ? (
                           <div>
-                            <div className="meta" style={{ marginBottom: 8 }}>Pedidos do cliente</div>
+                            <div className="meta admin-user-section-label">Pedidos do cliente</div>
                             {user.orders.slice(0, 4).map(order => (
-                              <p key={order.id} style={{ marginBottom: 6 }}>{order.id} - {order.status.toUpperCase()} - {formatPrice(order.total)}</p>
+                              <p key={order.id} className="admin-user-detail-row">{order.id} - {order.status.toUpperCase()} - {formatPrice(order.total)}</p>
                             ))}
                           </div>
                         ) : null}
@@ -1239,12 +1251,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                           </button>
                           <button
                             type="button"
-                            className="btn btn-secondary"
-                            style={{ marginLeft: 10 }}
+                            className="btn btn-secondary admin-btn-gap"
                             onClick={() => handleResendUserVerification(user)}
                             disabled={userVerificationSendingId === user.id || user.emailVerified || apiMode !== 'real'}
                           >
-                            {userVerificationSendingId === user.id ? 'Enviando...' : 'Reenviar verificacao'}
+                            {userVerificationSendingId === user.id ? 'Enviando...' : 'Reenviar verificação'}
                           </button>
                         </div>
                       </form>
@@ -1267,14 +1278,14 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     >
                       Anterior
                     </ActionButton>
-                    <span>Pagina {customerPage} de {customerPageCount}</span>
+                    <span>Página {customerPage} de {customerPageCount}</span>
                     <ActionButton
                       type="button"
                       tone="secondary"
                       disabled={customerPage >= customerPageCount}
                       onClick={() => setCustomerPage(page => Math.min(customerPageCount, page + 1))}
                     >
-                      Proxima
+                      Próxima
                     </ActionButton>
                   </div>
                 ) : null}
@@ -1282,7 +1293,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               ) : (
                 <p>{apiMode === 'real' ? 'Nenhum cliente cadastrado ainda.' : 'Clientes reais aparecem aqui quando o admin estiver conectado ao PostgreSQL.'}</p>
               )}
-            </section>
+            </SectionCard>
+            ) : null}
 
             <section className="info-block" hidden={activeSection !== 'products'}>
               <h2>Catálogo admin</h2>
