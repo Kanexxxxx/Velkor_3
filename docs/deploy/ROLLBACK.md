@@ -1,135 +1,109 @@
-# VOLKERR Rollback Guide
+# Rollback Guide — VELKOR / VOLKERR
 
-Use este guia quando um deploy quebrar build, inicializacao, auth, checkout, admin, email ou pagamentos.
+Use this guide when a production deploy causes errors, broken checkout, 500 responses, or payment failures.
 
-## Antes de todo deploy
+---
 
-Registre o commit atual:
+## 1. When to Rollback
 
-```bash
-cd /var/www/velkor
-git rev-parse HEAD
-```
+Trigger a rollback immediately if any of the following occur after a deploy:
 
-Crie backup do banco:
+- **Production 500 errors** — any page or API endpoint returning 500 that was working before the deploy.
+- **Broken checkout** — users cannot add items to cart, proceed through checkout, or complete a purchase.
+- **Mercado Pago errors** — payment preference creation fails, webhooks return non-200 responses, or order statuses are not updating.
+- **Admin inaccessible** — the admin panel fails to load or returns unexpected errors after login.
+- **Email failures** — order confirmation emails stop sending (after confirming it is not a transient SMTP issue).
 
-```bash
-pg_dump "$DATABASE_URL" > /var/backups/velkor/velkor-$(date +%Y%m%d-%H%M%S).sql
-```
+Do not wait for users to report multiple errors. Roll back as soon as a critical integration is confirmed broken.
 
-Confirme processos atuais:
+---
 
-```bash
-pm2 status
-curl -i https://volkerr.com.br/api/health
-```
+## 2. Rollback Commands
 
-## Rollback antes de migrations
+### Before running db:deploy (no schema migrations applied)
 
-Se a falha aconteceu antes de `npm run db:deploy --prefix backend`:
+Revert to the previous commit and restart processes:
 
 ```bash
-cd /var/www/velkor
-git checkout <commit-anterior>
-npm ci --prefix backend
-npm ci --prefix frontend
+cd /var/www/volkerr
+git checkout <previous-commit-hash>
+npm install --prefix backend
+npm install --prefix frontend
 npm run build --prefix frontend
-pm2 restart velkor-backend velkor-frontend
-curl -i https://volkerr.com.br/api/health
+pm2 restart velkor-backend --update-env
+pm2 restart velkor-frontend --update-env
+pm2 save
 ```
 
-## Rollback depois de migrations
+### After running db:deploy (schema migrations applied)
 
-Se migrations ja foram aplicadas, nao assuma que o codigo antigo e compativel com o schema novo.
-
-Procedimento seguro:
+Stop processes before restoring the database to prevent schema mismatches:
 
 ```bash
 pm2 stop velkor-backend velkor-frontend
 ```
 
-Restaure o backup compativel:
+See Section 3 for database restoration, then continue:
 
 ```bash
-psql "$DATABASE_URL" < /var/backups/velkor/<backup-compativel>.sql
-```
-
-Volte o codigo:
-
-```bash
-git checkout <commit-anterior>
-npm ci --prefix backend
-npm ci --prefix frontend
+git checkout <previous-commit-hash>
+npm install --prefix backend
+npm install --prefix frontend
 npm run build --prefix frontend
 pm2 restart velkor-backend velkor-frontend
-curl -i https://volkerr.com.br/api/health
+pm2 save
 ```
 
-## Admin emergencial
+---
 
-O admin real deve usar sessao e role `ADMIN`.
+## 3. Database Rollback
 
-Se o admin real falhar durante recuperacao, e somente temporariamente:
+### When to use the PostgreSQL backup
+
+Use the database backup only when schema migrations were applied AND the previous code version is not compatible with the new schema. If the code rollback alone restores functionality (e.g. no breaking schema changes), skip the database restore.
+
+### How to restore from backup
 
 ```bash
-nano backend/.env
+# Stop the backend first to prevent active connections
+pm2 stop velkor-backend
+
+# Restore the pre-deploy backup
+psql "$DATABASE_URL" < /var/backups/velkor_<timestamp>.sql
+
+# Restart after restore
+pm2 restart velkor-backend --update-env
 ```
 
-```env
-LEGACY_ADMIN_UNLOCK_ENABLED=true
-```
+Do not restore the database if orders were placed after the deploy started — you will lose those orders. Assess whether lost data is acceptable before restoring.
 
-Depois:
+---
+
+## 4. PM2 Verify
+
+After completing the rollback, run these checks to confirm the system is healthy:
 
 ```bash
-pm2 restart velkor-backend
-```
-
-Assim que recuperar o admin real:
-
-```env
-LEGACY_ADMIN_UNLOCK_ENABLED=false
-```
-
-```bash
-pm2 restart velkor-backend
-```
-
-## Mercado Pago
-
-Se webhooks estiverem gerando estados incorretos:
-
-- desative temporariamente o webhook no painel Mercado Pago;
-- preserve logs do backend;
-- nao reenvie eventos manualmente sem conferir `PaymentWebhookEvent`;
-- corrija o codigo;
-- rode testes;
-- reative webhook em sandbox antes de producao.
-
-## Email
-
-Se envio real estiver falhando:
-
-- verifique senha de app Gmail;
-- confirme `EMAIL_DEV_MODE=false`;
-- confira logs sem expor senha;
-- se o problema bloquear operacao critica, coloque `EMAIL_DEV_MODE=true` apenas durante recuperacao e comunique que emails reais estao pausados.
-
-## Verificacao apos rollback
-
-```bash
+# Check both processes are online
 pm2 status
+
+# Review recent backend logs for errors
 pm2 logs velkor-backend --lines 100
+
+# Review recent frontend logs
 pm2 logs velkor-frontend --lines 100
-curl -i https://volkerr.com.br/api/health
-curl -I https://volkerr.com.br
+
+# Smoke check — API health
+curl -i https://velkor.com.br/api/health
+
+# Smoke check — home page
+curl -I https://velkor.com.br
+
+# Smoke check — checkout page
+curl -I https://velkor.com.br/checkout
+
+# Smoke check — admin page
+curl -I https://velkor.com.br/admin
 ```
 
-Teste manualmente:
-
-- login admin;
-- carrinho;
-- checkout;
-- pedido;
-- painel admin;
-- newsletter.
+Both PM2 processes must show **online** status. All curl smoke checks must return HTTP 200. If the backend health endpoint still returns an error after rollback, check `pm2 logs velkor-backend` for database connection or startup errors.

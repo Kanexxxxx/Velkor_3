@@ -417,3 +417,69 @@ test('admin seed builds configured admin input from environment', () => {
   assert.equal(input.role, 'ADMIN');
   assert.equal(input.password, 'super-secret-password');
 });
+
+test('admin route generates payment link for pending order', async () => {
+  const { createAdminHandler } = require('../src/routes/admin');
+
+  const adminAuth = { findSessionUser: async () => ({ user: { id: 'adm_pay', role: 'ADMIN' } }) };
+  const customerAuth = { findSessionUser: async () => ({ user: { id: 'usr_pay', role: 'CUSTOMER' } }) };
+
+  // 1. Customers get 403
+  const customerRes = makeRes();
+  const customerHandler = createAdminHandler({
+    authRepo: customerAuth,
+    appConfig: {},
+    repo: {},
+  });
+  assert.equal(await customerHandler(makeReq({ method: 'POST', url: '/api/admin/orders/ord_pay1/payment-link' }), customerRes, null), true);
+  assert.equal(customerRes.statusCode, 403);
+
+  // 2. Not-found case: getOrderForPaymentLink returns { order: null, storage: 'demo' } → 404
+  const notFoundRes = makeRes();
+  const notFoundHandler = createAdminHandler({
+    authRepo: adminAuth,
+    appConfig: {},
+    repo: {
+      getOrderForPaymentLink: async () => ({ order: null, storage: 'demo' }),
+    },
+  });
+  assert.equal(await notFoundHandler(makeReq({ method: 'POST', url: '/api/admin/orders/ord_missing/payment-link' }), notFoundRes, null), true);
+  assert.equal(notFoundRes.statusCode, 404);
+
+  // 3. Success case: appConfig has no MERCADO_PAGO_ACCESS_TOKEN → dev-mode preference returned without HTTP
+  const successRes = makeRes();
+  let capturedOrderId = null;
+  const successHandler = createAdminHandler({
+    authRepo: adminAuth,
+    appConfig: {}, // no access token → dev mode
+    repo: {
+      getOrderForPaymentLink: async (id) => {
+        capturedOrderId = id;
+        return {
+          order: {
+            id,
+            email: 'buyer@example.com',
+            contactName: 'Buyer Silva',
+            contactPhone: '+55 16 99999-9999',
+            totalCents: 29990,
+            items: [{ productId: 'p1', name: 'Tênis Velkor', quantity: 1, unitPriceCents: 29990 }],
+            shippingAddress: {
+              street: 'Rua das Flores',
+              number: '100',
+              postalCode: '14000-000',
+            },
+          },
+          storage: 'database',
+        };
+      },
+    },
+  });
+  assert.equal(await successHandler(makeReq({ method: 'POST', url: '/api/admin/orders/ord_pay1/payment-link' }), successRes, null), true);
+  assert.equal(capturedOrderId, 'ord_pay1');
+  assert.equal(successRes.statusCode, 200);
+  const successBody = JSON.parse(successRes.body);
+  assert.equal(successBody.ok, true);
+  assert.equal(successBody.preference.preferenceId, 'dev_ord_pay1');
+  assert.equal(successBody.preference.sandbox, true);
+  assert.ok(typeof successBody.preference.initPoint === 'string' && successBody.preference.initPoint.length > 0);
+});

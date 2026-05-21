@@ -5,6 +5,7 @@ const { saveProductImageUpload } = require('../services/uploads');
 const { createEmailClient } = require('../services/email');
 const { sendOrderConfirmationIfNeeded, sendOrderShippedIfNeeded } = require('../services/order-email');
 const { parseNuvemshopProductCsv } = require('../services/nuvemshop-import');
+const { createMercadoPagoClient } = require('../services/mercado-pago');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
 const WRITE_LIMIT = { limit: 20, windowMs: 60 * 1000 };
@@ -205,6 +206,23 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
       if (url.pathname.startsWith('/api/admin/products/') && req.method === 'PATCH') {
         const id = extractId(url.pathname, '/api/admin/products/');
         sendJson(res, 200, await repo.updateProduct(id, await readJson(req), adminUserId), corsOrigin);
+        return true;
+      }
+
+      if (url.pathname.startsWith('/api/admin/orders/') && url.pathname.endsWith('/payment-link') && req.method === 'POST') {
+        const id = extractId(url.pathname, '/api/admin/orders/', '/payment-link');
+        const result = await repo.getOrderForPaymentLink(id, adminUserId);
+        if (!result?.order) {
+          sendJson(res, 404, { error: 'Pedido não encontrado.' }, corsOrigin);
+          return true;
+        }
+        try {
+          const mpClient = createMercadoPagoClient(appConfig);
+          const preference = await mpClient.createPreference({ order: result.order });
+          sendJson(res, 200, { ok: true, preference }, corsOrigin);
+        } catch (mpErr) {
+          sendJson(res, 502, { error: mpErr instanceof Error ? mpErr.message : 'Erro ao gerar link de pagamento.' }, corsOrigin);
+        }
         return true;
       }
 
