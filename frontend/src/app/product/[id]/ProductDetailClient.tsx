@@ -73,7 +73,7 @@ export function ProductDetailClient({ product: initialProduct }: ProductDetailCl
   const discount = product.discount ?? (
     product.oldPrice ? Math.round((1 - product.price / product.oldPrice) * 100) : 0
   );
-  const canPurchase = product.price > 0 && detailState.status !== 'error';
+  const canPurchase = product.price > 0;
 
   const tabContent: Record<TabId, string[]> = {
     desc: [

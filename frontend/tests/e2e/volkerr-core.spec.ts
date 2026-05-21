@@ -64,6 +64,9 @@ test.describe('VOLKERR core flows', () => {
     await page.getByLabel('Cidade').fill('Ribeirao Preto');
     await page.getByLabel('Estado').fill('SP');
 
+    // Wait for the shipping quote to appear (checkout has a 450ms debounce before fetching)
+    await expect(page.getByText(/Frete teste/i)).toBeVisible({ timeout: 5000 });
+
     await page.getByRole('button', { name: /Finalizar Pedido/i }).click();
 
     await expect(page.getByText(/Pedido .* salvo localmente|Pedido criado com sucesso/i)).toBeVisible();
