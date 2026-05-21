@@ -121,6 +121,7 @@ export interface AdminProductImportRow {
       sku: string | null;
       stock: number | null;
       description: string | null;
+      imageWarning?: boolean;
     };
   };
 }
@@ -235,14 +236,14 @@ export async function uploadAdminProductImage(input: { filename: string; dataUrl
   });
 }
 
-export async function previewAdminProductImport(input: { filename: string; csv: string }) {
+export async function previewAdminProductImport(input: { filename: string; csv: string; sourceStoreUrl?: string }) {
   return request<AdminProductImportPreview>('/api/admin/products/import/preview', {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
-export async function importAdminProducts(input: { filename: string; csv: string }) {
+export async function importAdminProducts(input: { filename: string; csv: string; sourceStoreUrl?: string }) {
   return request<AdminProductImportResult>('/api/admin/products/import', {
     method: 'POST',
     body: JSON.stringify(input),
