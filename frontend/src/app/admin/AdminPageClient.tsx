@@ -220,7 +220,8 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
   const [productUploading, setProductUploading] = useState(false);
   const [productError, setProductError] = useState('');
   const [productImportPreview, setProductImportPreview] = useState<AdminProductImportPreview | null>(null);
-  const [productImportFile, setProductImportFile] = useState<{ filename: string; csv: string } | null>(null);
+  const [productImportFile, setProductImportFile] = useState<{ filename: string; csv: string; sourceStoreUrl?: string } | null>(null);
+  const [productImportStoreUrl, setProductImportStoreUrl] = useState('https://velkor7.lojavirtualnuvem.com.br');
   const [productImportLoading, setProductImportLoading] = useState(false);
   const [productImportError, setProductImportError] = useState('');
   const [productImportSummary, setProductImportSummary] = useState('');
@@ -604,13 +605,25 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
     setProductImportFile(null);
     try {
       const csv = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Não foi possível ler o CSV.'));
-        reader.readAsText(file, 'utf-8');
+        const r = new FileReader();
+        r.onload = () => {
+          const text = String(r.result || '');
+          if (text.includes('�')) {
+            // File is Latin-1 (common for Tiendanube/Nuvemshop exports)
+            const r2 = new FileReader();
+            r2.onload = () => resolve(String(r2.result || ''));
+            r2.onerror = () => reject(new Error('Não foi possível ler o CSV.'));
+            r2.readAsText(file, 'iso-8859-1');
+          } else {
+            resolve(text);
+          }
+        };
+        r.onerror = () => reject(new Error('Não foi possível ler o CSV.'));
+        r.readAsText(file, 'utf-8');
       });
-      const preview = await previewAdminProductImport({ filename: file.name, csv });
-      setProductImportFile({ filename: file.name, csv });
+      const sourceStoreUrl = productImportStoreUrl.trim();
+      const preview = await previewAdminProductImport({ filename: file.name, csv, sourceStoreUrl: sourceStoreUrl || undefined });
+      setProductImportFile({ filename: file.name, csv, sourceStoreUrl: sourceStoreUrl || undefined });
       setProductImportPreview(preview);
       const firstValid = preview.preview.rows.find(row => row.status === 'valid');
       if (firstValid) setProductForm(importRowToForm(firstValid.product));
@@ -1370,8 +1383,19 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
               <div className="form-block account-form admin-form-gap">
                 <div className="admin-import-grid">
                   <div>
-                    <div className="section-num admin-import-label">IMPORTAR NUVEMSHOP</div>
+                    <div className="section-num admin-import-label">IMPORTAR NUVEMSHOP / TIENDANUBE</div>
                     <p className="admin-import-desc">Envie o CSV exportado da Nuvemshop para validar nomes, preços, imagens e categorias antes de cadastrar.</p>
+                    <div className="field admin-import-url-field">
+                      <label htmlFor="admin-import-store-url">URL da loja de origem (para buscar imagens)</label>
+                      <input
+                        id="admin-import-store-url"
+                        type="url"
+                        value={productImportStoreUrl}
+                        onChange={event => setProductImportStoreUrl(event.target.value)}
+                        placeholder="https://suasloja.lojavirtualnuvem.com.br"
+                        disabled={productImportLoading}
+                      />
+                    </div>
                     <input
                       type="file"
                       accept=".csv,text/csv"
@@ -1381,7 +1405,11 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     />
                   </div>
                   <div className="meta admin-import-meta">
-                    {productImportLoading ? 'Lendo CSV...' : productImportPreview ? `${productImportPreview.preview.validCount} válidos / ${productImportPreview.preview.errorCount} revisar` : 'Preview seguro'}
+                    {productImportLoading
+                      ? (productImportStoreUrl.trim() ? 'Lendo CSV e buscando imagens...' : 'Lendo CSV...')
+                      : productImportPreview
+                        ? `${productImportPreview.preview.validCount} válidos / ${productImportPreview.preview.errorCount} revisar`
+                        : 'Preview seguro'}
                   </div>
                 </div>
                 {productImportError ? <p className="admin-error-notice admin-form-gap-xs">{productImportError}</p> : null}
@@ -1406,12 +1434,26 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     ) : null}
                     {productImportPreview.preview.rows.slice(0, 6).map(row => (
                       <div className="summary-item admin-order-item" key={`${row.rowNumber}-${row.product.id ?? row.product.name}`}>
-                        <div>
-                          <h5>Linha {row.rowNumber}: {row.product.name || 'Produto sem nome'}</h5>
-                          <div className="meta">
-                            {row.status === 'valid'
-                              ? `${row.product.category} - ${row.product.price ? formatPrice(row.product.price) : 'sem preco'} - ${row.product.importNotes?.stock ?? 'estoque n/a'} un.`
-                              : row.errors.join(' ')}
+                        <div className="admin-product-row">
+                          {row.product.image ? (
+                            <span
+                              className="admin-product-thumb"
+                              style={{ backgroundImage: `url(${row.product.image})` }}
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <span className="admin-product-thumb admin-product-thumb--empty" aria-hidden="true" />
+                          )}
+                          <div>
+                            <h5>{row.product.name || 'Produto sem nome'}</h5>
+                            <div className="meta">
+                              {row.status === 'valid'
+                                ? `${row.product.category} · ${row.product.price ? formatPrice(row.product.price) : 'sem preço'} · ${row.product.sizes?.join(', ') || 'sem tamanhos'} · estoque ${row.product.importNotes?.stock ?? 'n/a'}`
+                                : row.errors.join(' ')}
+                            </div>
+                            {row.product.importNotes?.imageWarning ? (
+                              <div className="meta admin-import-warn">Sem imagem — adicione depois no formulário.</div>
+                            ) : null}
                           </div>
                         </div>
                         <button

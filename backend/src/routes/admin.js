@@ -4,7 +4,7 @@ const { requireAdmin, sendJson } = require('./guards');
 const { saveProductImageUpload } = require('../services/uploads');
 const { createEmailClient } = require('../services/email');
 const { sendOrderConfirmationIfNeeded, sendOrderShippedIfNeeded } = require('../services/order-email');
-const { parseNuvemshopProductCsv } = require('../services/nuvemshop-import');
+const { parseNuvemshopProductCsv, enrichWithStoreImages } = require('../services/nuvemshop-import');
 const { createMercadoPagoClient } = require('../services/mercado-pago');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
@@ -141,13 +141,16 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
       if (url.pathname === '/api/admin/products/import/preview' && req.method === 'POST') {
         const payload = JSON.parse(await readBody(req, 2 * 1024 * 1024) || '{}');
         const csv = typeof payload.csv === 'string' ? payload.csv : '';
+        const sourceStoreUrl = typeof payload.sourceStoreUrl === 'string' ? payload.sourceStoreUrl.trim() : '';
         if (!csv.trim()) {
           sendJson(res, 400, { error: 'Arquivo CSV vazio.' }, corsOrigin);
           return true;
         }
+        let preview = parseNuvemshopProductCsv(csv);
+        if (sourceStoreUrl) preview = await enrichWithStoreImages(preview, sourceStoreUrl);
         sendJson(res, 200, {
           filename: typeof payload.filename === 'string' ? payload.filename.slice(0, 180) : 'catalogo.csv',
-          preview: parseNuvemshopProductCsv(csv),
+          preview,
           storage: 'preview',
         }, corsOrigin);
         return true;
@@ -156,12 +159,14 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
       if (url.pathname === '/api/admin/products/import' && req.method === 'POST') {
         const payload = JSON.parse(await readBody(req, 2 * 1024 * 1024) || '{}');
         const csv = typeof payload.csv === 'string' ? payload.csv : '';
+        const sourceStoreUrl = typeof payload.sourceStoreUrl === 'string' ? payload.sourceStoreUrl.trim() : '';
         if (!csv.trim()) {
           sendJson(res, 400, { error: 'Arquivo CSV vazio.' }, corsOrigin);
           return true;
         }
 
-        const preview = parseNuvemshopProductCsv(csv, { maxRows: 50 });
+        let preview = parseNuvemshopProductCsv(csv, { maxRows: 50 });
+        if (sourceStoreUrl) preview = await enrichWithStoreImages(preview, sourceStoreUrl);
         const results = [];
         for (const row of preview.rows) {
           if (row.status !== 'valid') {
