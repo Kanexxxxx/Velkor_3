@@ -5,7 +5,7 @@ const { saveProductImageUpload } = require('../services/uploads');
 const { createEmailClient } = require('../services/email');
 const { sendOrderConfirmationIfNeeded, sendOrderShippedIfNeeded } = require('../services/order-email');
 const { parseNuvemshopProductCsv, enrichWithStoreImages } = require('../services/nuvemshop-import');
-const { createMercadoPagoClient } = require('../services/mercado-pago');
+const { resolvePaymentProvider } = require('../services/payment-provider');
 
 const READ_LIMIT = { limit: 60, windowMs: 60 * 1000 };
 const WRITE_LIMIT = { limit: 20, windowMs: 60 * 1000 };
@@ -222,11 +222,17 @@ function createAdminHandler({ repo = adminRepo, authRepo = authRepoDefault, appC
           return true;
         }
         try {
-          const mpClient = createMercadoPagoClient(appConfig);
-          const preference = await mpClient.createPreference({ order: result.order });
+          const provider = resolvePaymentProvider(appConfig);
+          const checkout = await provider.createCheckout({ order: result.order });
+          const preference = {
+            provider: checkout.provider,
+            preferenceId: checkout.checkoutId,
+            initPoint: checkout.redirectUrl,
+            sandbox: checkout.sandbox,
+          };
           sendJson(res, 200, { ok: true, preference }, corsOrigin);
-        } catch (mpErr) {
-          sendJson(res, 502, { error: mpErr instanceof Error ? mpErr.message : 'Erro ao gerar link de pagamento.' }, corsOrigin);
+        } catch (payErr) {
+          sendJson(res, 502, { error: payErr instanceof Error ? payErr.message : 'Erro ao gerar link de pagamento.' }, corsOrigin);
         }
         return true;
       }

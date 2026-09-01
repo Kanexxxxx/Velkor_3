@@ -734,6 +734,7 @@ function paymentLabel(payment: string | undefined) {
   switch (payment) {
     case 'card': return 'Cartão';
     case 'mercado-pago': return 'Mercado Pago';
+    case 'asaas': return 'Pix, cartão ou boleto';
     case 'pix': return 'Pix';
     case 'boleto': return 'Boleto';
     default: return payment;

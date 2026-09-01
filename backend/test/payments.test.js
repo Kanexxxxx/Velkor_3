@@ -139,7 +139,8 @@ test('payments route accepts Mercado Pago signed webhook notifications', async (
   const processed = [];
   const handler = createPaymentsHandler({
     appConfig: { MERCADO_PAGO_WEBHOOK_SECRET: secret },
-    mercadoPago: {
+    paymentProvider: {
+      id: 'mercado_pago',
       getPayment: async id => {
         assert.equal(id, dataId);
         return { status: 'approved', external_reference: 'order_1' };
@@ -243,12 +244,111 @@ test('payments route lets authenticated customer reopen payment by order email',
         return { order: {}, storage: 'database' };
       },
     },
-    mercadoPago: {
-      createPreference: async () => ({ provider: 'mercado_pago', preferenceId: 'pref_email', initPoint: 'https://mp.test', sandbox: false }),
+    paymentProvider: {
+      id: 'mercado_pago',
+      createCheckout: async () => ({ provider: 'mercado_pago', checkoutId: 'pref_email', redirectUrl: 'https://mp.test', sandbox: false }),
     },
   });
 
   assert.equal(await handler(req, res, null), true);
   assert.equal(res.statusCode, 200);
   assert.deepEqual(seen, { orderId: 'order_email', sessionId: 'guest_new', customerEmail: 'buyer@example.com' });
+});
+
+test('payments route creates an Asaas checkout and stores the provider', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const req = require('node:stream').Readable.from([JSON.stringify({ orderId: 'order_asaas' })]);
+  req.method = 'POST';
+  req.url = '/api/payments/create-preference';
+  req.headers = { host: 'localhost:3001', 'x-velkor-session': 'guest_asaas' };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const stored = {};
+  const handler = createPaymentsHandler({
+    repo: {
+      getOrderForPayment: async () => ({ id: 'order_asaas', sessionId: 'guest_asaas', email: 'a@b.com', totalCents: 12900, items: [] }),
+      createPaymentPreferenceRecord: async payload => { Object.assign(stored, payload); return { order: {}, storage: 'database' }; },
+    },
+    paymentProvider: {
+      id: 'asaas',
+      createCheckout: async ({ order }) => {
+        assert.equal(order.id, 'order_asaas');
+        return { provider: 'asaas', checkoutId: 'chk_123', redirectUrl: 'https://asaas.test/checkoutSession/show?id=chk_123', sandbox: true };
+      },
+    },
+  });
+
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 200);
+  const body = JSON.parse(res.body);
+  assert.equal(body.provider, 'asaas');
+  assert.equal(body.preferenceId, 'chk_123');
+  assert.match(body.initPoint, /checkoutSession/);
+  assert.equal(stored.provider, 'asaas');
+  assert.equal(stored.checkoutId, 'chk_123');
+});
+
+test('payments route rejects an Asaas webhook with a wrong token', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const req = require('node:stream').Readable.from([JSON.stringify({
+    event: 'PAYMENT_CONFIRMED',
+    payment: { id: 'pay_1', status: 'CONFIRMED', externalReference: 'order_1' },
+  })]);
+  req.method = 'POST';
+  req.url = '/api/payments/webhook';
+  req.headers = { host: 'localhost:3001', 'asaas-access-token': 'wrong' };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const handler = createPaymentsHandler({ appConfig: { ASAAS_WEBHOOK_TOKEN: 'right-token' } });
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 401);
+});
+
+test('payments route processes a signed Asaas payment webhook and emails the buyer', async () => {
+  const { createPaymentsHandler } = require('../src/routes/payments');
+  const token = 'asaas-webhook-token';
+  const req = require('node:stream').Readable.from([JSON.stringify({
+    id: 'evt_asaas_1',
+    event: 'PAYMENT_RECEIVED',
+    payment: { id: 'pay_9', status: 'RECEIVED', externalReference: 'order_9' },
+  })]);
+  req.method = 'POST';
+  req.url = '/api/payments/webhook';
+  req.headers = { host: 'localhost:3001', 'asaas-access-token': token };
+  req.socket = { remoteAddress: '127.0.0.1' };
+  const res = {
+    statusCode: 0,
+    body: '',
+    writeHead(statusCode) { this.statusCode = statusCode; },
+    end(body = '') { this.body = body; },
+  };
+  const processed = [];
+  const sent = [];
+  const handler = createPaymentsHandler({
+    appConfig: { ASAAS_WEBHOOK_TOKEN: token },
+    repo: {
+      processPaymentWebhook: async payload => { processed.push(payload); return { processed: true, duplicate: false, storage: 'database' }; },
+      getOrderForNotification: async orderId => ({ id: orderId, status: 'paid', email: 'buyer@example.com', totalCents: 1000, items: [] }),
+    },
+    emailService: { sendOrderPaymentApproved: async payload => { sent.push(payload); return { sent: true, mode: 'smtp' }; } },
+  });
+
+  assert.equal(await handler(req, res, null), true);
+  assert.equal(res.statusCode, 200);
+  assert.equal(processed[0].provider, 'asaas');
+  assert.equal(processed[0].externalId, 'pay_9');
+  assert.equal(processed[0].orderId, 'order_9');
+  assert.equal(processed[0].eventId, 'evt_asaas_1');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'buyer@example.com');
 });

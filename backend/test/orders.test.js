@@ -89,17 +89,33 @@ test('order totals use a server-side Melhor Envio shipping quote', async () => {
   assert.equal(quote.shippingMethod, 'melhor-envio:sedex');
 });
 
-test('order payload validation normalizes payment to Mercado Pago', () => {
+test('order payload validation normalizes payment to the configured provider', () => {
   const { validateOrderInput } = require('../src/db/orders');
+  const previous = process.env.PAYMENT_PROVIDER;
 
-  const parsed = validateOrderInput({
-    items: [{ productId: 'v01', quantity: 1, size: '42', color: '#0a0a0a' }],
-    contact: { name: 'Kaina', email: 'kaina@example.com' },
-    address: { recipient: 'Kaina', street: 'Rua A', city: 'Sao Paulo', region: 'SP', postalCode: '14000-000', country: 'Brasil' },
-    shipping: 'standard',
-    payment: 'pix',
-  });
+  try {
+    delete process.env.PAYMENT_PROVIDER;
+    const mp = validateOrderInput({
+      items: [{ productId: 'v01', quantity: 1, size: '42', color: '#0a0a0a' }],
+      contact: { name: 'Kaina', email: 'kaina@example.com' },
+      address: { recipient: 'Kaina', street: 'Rua A', city: 'Sao Paulo', region: 'SP', postalCode: '14000-000', country: 'Brasil' },
+      shipping: 'standard',
+      payment: 'pix',
+    });
+    assert.equal(mp.error, undefined);
+    assert.equal(mp.value.payment, 'mercado-pago');
 
-  assert.equal(parsed.error, undefined);
-  assert.equal(parsed.value.payment, 'mercado-pago');
+    process.env.PAYMENT_PROVIDER = 'asaas';
+    const asaas = validateOrderInput({
+      items: [{ productId: 'v01', quantity: 1, size: '42', color: '#0a0a0a' }],
+      contact: { name: 'Kaina', email: 'kaina@example.com' },
+      address: { recipient: 'Kaina', street: 'Rua A', city: 'Sao Paulo', region: 'SP', postalCode: '14000-000', country: 'Brasil' },
+      shipping: 'standard',
+      payment: 'pix',
+    });
+    assert.equal(asaas.value.payment, 'asaas');
+  } finally {
+    if (previous === undefined) delete process.env.PAYMENT_PROVIDER;
+    else process.env.PAYMENT_PROVIDER = previous;
+  }
 });

@@ -2,7 +2,7 @@
 
 > Formerly VELKOR
 
-Modern Brazilian e-commerce platform built with Next.js, Node.js, PostgreSQL and Prisma, featuring real authentication, admin dashboard, email workflows, Mercado Pago payments, real shipping integration and VPS-ready production architecture.
+Modern Brazilian e-commerce platform built with Next.js, Node.js, PostgreSQL and Prisma, featuring real authentication, admin dashboard, email workflows, Asaas payments (Mercado Pago as fallback), real shipping integration and VPS-ready production architecture.
 
 ---
 
@@ -26,7 +26,8 @@ Modern Brazilian e-commerce platform built with Next.js, Node.js, PostgreSQL and
 
 ## Integrations
 
-* Mercado Pago
+* Asaas (PIX, card, boleto)
+* Mercado Pago (fallback)
 * Melhor Envio
 * Gmail SMTP
 
@@ -70,8 +71,9 @@ Modern Brazilian e-commerce platform built with Next.js, Node.js, PostgreSQL and
 
 ## Payments & Shipping
 
-* Mercado Pago checkout
-* Secure webhook validation
+* Asaas hosted checkout (PIX, card, boleto)
+* Mercado Pago checkout (fallback via `PAYMENT_PROVIDER`)
+* Secure webhook validation (Asaas token / Mercado Pago HMAC)
 * Real shipping calculation
 * Melhor Envio integration
 * Shipping fallback mode
@@ -170,6 +172,7 @@ Never expose:
 * SESSION_SECRET
 * ADMIN_SECRET
 * Gmail credentials
+* Asaas API key and webhook token
 * Mercado Pago access token
 * Melhor Envio tokens
 * Webhook secrets
@@ -280,7 +283,7 @@ https://volkerr.com.br
 * bcrypt password hashing
 * SHA-256 session token hashing
 * Rate limiting
-* Secure Mercado Pago webhook validation
+* Secure payment webhook validation (Asaas token / Mercado Pago HMAC)
 * Environment-based configuration
 * No secrets committed to Git
 * Backend-only sensitive integrations
@@ -298,7 +301,7 @@ Node.js Backend API
    ↓
 PostgreSQL + Prisma
    ↓
-Mercado Pago / Melhor Envio / Gmail
+Asaas or Mercado Pago / Melhor Envio / Gmail
 ```
 
 ---
@@ -331,7 +334,7 @@ Recommended workflow:
 * Real authentication
 * Real admin
 * Email workflows
-* Mercado Pago integration
+* Asaas + Mercado Pago integration
 * VPS production setup
 
 ## In Progress

@@ -1,10 +1,16 @@
 const { getPrisma } = require('./client');
+const { mapAsaasStatus } = require('../services/asaas');
 
 function mapMercadoPagoStatus(status) {
   if (status === 'approved') return { paymentStatus: 'APPROVED', orderStatus: 'PAID' };
   if (status === 'rejected') return { paymentStatus: 'REJECTED', orderStatus: null };
   if (status === 'refunded') return { paymentStatus: 'REFUNDED', orderStatus: null };
   return { paymentStatus: 'PENDING', orderStatus: null };
+}
+
+function mapProviderStatus(provider, status) {
+  if (provider === 'asaas') return mapAsaasStatus(status);
+  return mapMercadoPagoStatus(status);
 }
 
 async function getOrderForPayment(orderId, sessionId, customerEmail = '') {
@@ -18,7 +24,7 @@ async function getOrderForPayment(orderId, sessionId, customerEmail = '') {
         ...(customerEmail ? [{ email: customerEmail }] : []),
       ],
     },
-    include: { items: true },
+    include: { items: true, shippingAddress: true },
   });
 }
 
@@ -31,15 +37,15 @@ async function getOrderForNotification(orderId) {
   });
 }
 
-async function createPaymentPreferenceRecord({ orderId, sessionId, preferenceId, customerEmail = '' }) {
+async function createPaymentPreferenceRecord({ orderId, sessionId, checkoutId, preferenceId, provider = 'mercado_pago', customerEmail = '' }) {
   const prisma = getPrisma();
   if (!prisma) return { order: null, storage: 'demo' };
 
   const order = await prisma.order.update({
     where: { id: orderId },
     data: {
-      paymentProvider: 'mercado_pago',
-      paymentPreferenceId: preferenceId,
+      paymentProvider: provider,
+      paymentPreferenceId: checkoutId || preferenceId,
       paymentStatus: 'PENDING',
     },
   });
@@ -53,18 +59,18 @@ async function createPaymentPreferenceRecord({ orderId, sessionId, preferenceId,
   return { order, storage: 'database' };
 }
 
-async function processPaymentWebhook({ eventId, eventType, externalId, orderId, status, payload }) {
+async function processPaymentWebhook({ eventId, eventType, externalId, orderId, status, payload, provider = 'mercado_pago' }) {
   const prisma = getPrisma();
   if (!prisma) return { processed: false, duplicate: false, storage: 'demo' };
 
   const existing = await prisma.paymentWebhookEvent.findUnique({ where: { eventId } });
   if (existing) return { processed: false, duplicate: true, storage: 'database' };
 
-  const mapped = mapMercadoPagoStatus(status);
+  const mapped = mapProviderStatus(provider, status);
   await prisma.$transaction(async tx => {
     await tx.paymentWebhookEvent.create({
       data: {
-        provider: 'mercado_pago',
+        provider,
         eventId,
         eventType,
         externalId,
@@ -77,7 +83,7 @@ async function processPaymentWebhook({ eventId, eventType, externalId, orderId, 
       await tx.order.update({
         where: { id: orderId },
         data: {
-          paymentProvider: 'mercado_pago',
+          paymentProvider: provider,
           paymentExternalId: externalId,
           paymentStatus: mapped.paymentStatus,
           ...(mapped.orderStatus ? { status: mapped.orderStatus } : {}),
@@ -95,5 +101,6 @@ module.exports = {
   getOrderForNotification,
   getOrderForPayment,
   mapMercadoPagoStatus,
+  mapProviderStatus,
   processPaymentWebhook,
 };

@@ -3,7 +3,8 @@ const { getSessionId } = require('../db/session');
 const authRepoDefault = require('../db/auth');
 const { parseCookies } = require('./auth');
 const { createEmailClient } = require('../services/email');
-const { createMercadoPagoClient } = require('../services/mercado-pago');
+const { resolvePaymentProvider } = require('../services/payment-provider');
+const { isAsaasPaidStatus } = require('../services/asaas');
 const { sendPaymentApprovedIfNeeded } = require('../services/order-email');
 const { sendJson } = require('./guards');
 const crypto = require('crypto');
@@ -39,6 +40,8 @@ async function readJson(req) {
   return JSON.parse(body);
 }
 
+/* ── Mercado Pago webhook signature ─────────────────────────── */
+
 function parseMercadoPagoSignature(value) {
   return String(value || '')
     .split(',')
@@ -66,7 +69,7 @@ function getWebhookDataId(url, payload) {
   return url.searchParams.get('data.id') || payload?.data?.id || payload?.id || payload?.externalId || '';
 }
 
-function verifyWebhook(req, url, payload, appConfig) {
+function verifyMercadoPagoWebhook(req, url, payload, appConfig) {
   const secret = appConfig.MERCADO_PAGO_WEBHOOK_SECRET || '';
   if (!secret) return true;
   if (req.headers['x-velkor-webhook-secret'] === secret) return true;
@@ -78,6 +81,31 @@ function verifyWebhook(req, url, payload, appConfig) {
   });
 }
 
+/* ── Asaas webhook token ────────────────────────────────────── */
+
+function safeEqualUtf8(left, right) {
+  const a = Buffer.from(String(left || ''), 'utf8');
+  const b = Buffer.from(String(right || ''), 'utf8');
+  if (a.length !== b.length || a.length === 0) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function verifyAsaasWebhook(req, appConfig) {
+  const expected = appConfig.ASAAS_WEBHOOK_TOKEN || '';
+  if (!expected) return true;
+  if (req.headers['x-velkor-webhook-secret'] === expected) return true;
+  return safeEqualUtf8(req.headers['asaas-access-token'], expected);
+}
+
+function looksLikeAsaasWebhook(payload) {
+  return Boolean(
+    payload &&
+    typeof payload.event === 'string' &&
+    /^[A-Z][A-Z_]+$/.test(payload.event) &&
+    (payload.payment || payload.checkout)
+  );
+}
+
 async function getCustomerEmail(req, authRepo) {
   const rawToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME] || '';
   if (!rawToken || !authRepo?.findSessionUser) return '';
@@ -85,7 +113,29 @@ async function getCustomerEmail(req, authRepo) {
   return current?.user?.email || '';
 }
 
-function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercadoPagoClient(), appConfig = process.env, emailService = createEmailClient(appConfig), authRepo = authRepoDefault } = {}) {
+function isApprovedStatus(provider, status) {
+  if (provider === 'asaas') return isAsaasPaidStatus(status);
+  return String(status || '').toLowerCase() === 'approved';
+}
+
+async function maybeSendApprovedEmail({ repo, provider, status, orderId, result, emailService }) {
+  if (!result.processed || !orderId) return;
+  if (!isApprovedStatus(provider, status)) return;
+  if (typeof repo.getOrderForNotification !== 'function') return;
+  const order = await repo.getOrderForNotification(orderId);
+  const email = await sendPaymentApprovedIfNeeded({ orderResult: { order, storage: result.storage }, emailService });
+  if (email) result.email = email;
+}
+
+function createPaymentsHandler({
+  repo = paymentRepo,
+  paymentProvider,
+  appConfig = process.env,
+  emailService = createEmailClient(appConfig),
+  authRepo = authRepoDefault,
+} = {}) {
+  const provider = paymentProvider || resolvePaymentProvider(appConfig);
+
   return async function handlePaymentsRequest(req, res, corsOrigin) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (!url.pathname.startsWith('/api/payments')) return false;
@@ -109,23 +159,63 @@ function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercado
           sendJson(res, 404, { error: 'Pedido nao encontrado.' }, corsOrigin);
           return true;
         }
-        const preference = await mercadoPago.createPreference({ order });
-        await repo.createPaymentPreferenceRecord({ orderId, sessionId, customerEmail, preferenceId: preference.preferenceId });
-        sendJson(res, 200, preference, corsOrigin);
+        const checkout = await provider.createCheckout({ order });
+        await repo.createPaymentPreferenceRecord({
+          provider: checkout.provider,
+          orderId,
+          sessionId,
+          customerEmail,
+          checkoutId: checkout.checkoutId,
+        });
+        sendJson(res, 200, {
+          provider: checkout.provider,
+          preferenceId: checkout.checkoutId,
+          initPoint: checkout.redirectUrl,
+          sandbox: checkout.sandbox,
+        }, corsOrigin);
         return true;
       }
 
       if (url.pathname === '/api/payments/webhook' && req.method === 'POST') {
         const payload = await readJson(req);
-        if (!verifyWebhook(req, url, payload, appConfig)) {
+
+        // ── Asaas ──────────────────────────────────────────────
+        if (looksLikeAsaasWebhook(payload)) {
+          if (!verifyAsaasWebhook(req, appConfig)) {
+            sendJson(res, 401, { error: 'Webhook invalido.' }, corsOrigin);
+            return true;
+          }
+          const node = payload.payment || payload.checkout || {};
+          const externalId = node.id || null;
+          const orderId = node.externalReference || payload.externalReference || null;
+          const status = node.status || (payload.event === 'CHECKOUT_PAID' ? 'CONFIRMED' : undefined);
+          const eventId = String(
+            payload.id || [payload.event || 'asaas', externalId || 'unknown', status || 'unknown'].join(':'),
+          );
+          const result = await repo.processPaymentWebhook({
+            provider: 'asaas',
+            eventId,
+            eventType: payload.event || 'payment',
+            externalId,
+            orderId,
+            status,
+            payload,
+          });
+          await maybeSendApprovedEmail({ repo, provider: 'asaas', status, orderId, result, emailService });
+          sendJson(res, 200, { ok: true, ...result }, corsOrigin);
+          return true;
+        }
+
+        // ── Mercado Pago (legado / rollback) ───────────────────
+        if (!verifyMercadoPagoWebhook(req, url, payload, appConfig)) {
           sendJson(res, 401, { error: 'Webhook invalido.' }, corsOrigin);
           return true;
         }
         const externalId = payload.externalId || payload.data?.id || url.searchParams.get('data.id') || null;
         let status = payload.status;
         let orderId = payload.orderId || payload.external_reference || null;
-        if (!status && externalId) {
-          const payment = await mercadoPago.getPayment(externalId);
+        if (!status && externalId && typeof provider.getPayment === 'function') {
+          const payment = await provider.getPayment(externalId);
           status = payment?.status;
           orderId = orderId || payment?.external_reference || null;
         }
@@ -136,6 +226,7 @@ function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercado
           payload.date_created || '',
         ].filter(Boolean).join(':') || `evt_${Date.now()}`);
         const result = await repo.processPaymentWebhook({
+          provider: 'mercado_pago',
           eventId,
           eventType: payload.type || 'payment',
           externalId,
@@ -143,11 +234,7 @@ function createPaymentsHandler({ repo = paymentRepo, mercadoPago = createMercado
           status,
           payload,
         });
-        if (result.processed && String(status).toLowerCase() === 'approved' && orderId && typeof repo.getOrderForNotification === 'function') {
-          const order = await repo.getOrderForNotification(orderId);
-          const email = await sendPaymentApprovedIfNeeded({ orderResult: { order, storage: result.storage }, emailService });
-          if (email) result.email = email;
-        }
+        await maybeSendApprovedEmail({ repo, provider: 'mercado_pago', status, orderId, result, emailService });
         sendJson(res, 200, { ok: true, ...result }, corsOrigin);
         return true;
       }
@@ -173,5 +260,9 @@ module.exports = {
   createPaymentsHandler,
   parseMercadoPagoSignature,
   verifyMercadoPagoSignature,
-  verifyWebhook,
+  verifyMercadoPagoWebhook,
+  verifyAsaasWebhook,
+  looksLikeAsaasWebhook,
+  // alias mantido para compatibilidade
+  verifyWebhook: verifyMercadoPagoWebhook,
 };

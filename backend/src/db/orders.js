@@ -42,7 +42,7 @@ function validateOrderInput(input) {
   if (!normalizeText(address.postalCode, 20)) return { error: 'CEP invalido.' };
 
   const shipping = normalizeText(input.shipping, 120) || 'standard';
-  const payment = 'mercado-pago';
+  const payment = String(process.env.PAYMENT_PROVIDER || '').toLowerCase() === 'asaas' ? 'asaas' : 'mercado-pago';
 
   return {
     value: {

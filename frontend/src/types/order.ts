@@ -3,7 +3,7 @@ import type { Address } from './user';
 
 export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'fulfilled' | 'delivered' | 'cancelled';
 
-export type OrderPayment = 'mercado-pago';
+export type OrderPayment = 'mercado-pago' | 'asaas';
 
 export type OrderShipping = string;
 

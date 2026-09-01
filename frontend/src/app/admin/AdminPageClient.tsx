@@ -1040,10 +1040,16 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                   <StatusBadge tone={apiMode === 'real' ? 'success' : 'warning'}>{apiMode === 'real' ? 'Online' : 'Fallback'}</StatusBadge>
                 </div>
                 <div>
-                  <span>Mercado Pago</span>
-                  <StatusBadge tone={adminSettings?.integrations.mercadoPago.configured ? 'success' : 'warning'}>
-                    {adminSettings?.integrations.mercadoPago.configured ? 'Configurado' : 'Pendente'}
-                  </StatusBadge>
+                  <span>Pagamentos ({adminSettings?.integrations.paymentProvider === 'asaas' ? 'Asaas' : 'Mercado Pago'})</span>
+                  {adminSettings?.integrations.paymentProvider === 'asaas' ? (
+                    <StatusBadge tone={adminSettings?.integrations.asaas.configured ? 'success' : 'warning'}>
+                      {adminSettings?.integrations.asaas.configured ? 'Configurado' : 'Pendente'}
+                    </StatusBadge>
+                  ) : (
+                    <StatusBadge tone={adminSettings?.integrations.mercadoPago.configured ? 'success' : 'warning'}>
+                      {adminSettings?.integrations.mercadoPago.configured ? 'Configurado' : 'Pendente'}
+                    </StatusBadge>
+                  )}
                 </div>
                 <div>
                   <span>SMTP</span>
@@ -1763,7 +1769,15 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
                     <div className="meta">{adminSettings.store.supportEmail} - {adminSettings.store.whatsapp || 'WhatsApp não configurado'}</div>
                   </div>
                   <div className="summary-item admin-settings-item">
-                    <h5>Mercado Pago</h5>
+                    <h5>Provedor de pagamento</h5>
+                    <div className="meta">ativo: {adminSettings.integrations.paymentProvider === 'asaas' ? 'Asaas' : 'Mercado Pago'}</div>
+                  </div>
+                  <div className="summary-item admin-settings-item">
+                    <h5>Asaas</h5>
+                    <div className="meta">{adminSettings.integrations.asaas.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.asaas.devMode ? 'sandbox/dev ativo' : adminSettings.integrations.asaas.env} - webhook {adminSettings.integrations.asaas.webhookConfigured ? 'ok' : 'pendente'}</div>
+                  </div>
+                  <div className="summary-item admin-settings-item">
+                    <h5>Mercado Pago (legado)</h5>
                     <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'configurado' : 'pendente'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'produção'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
                   </div>
                   <div className="summary-item admin-settings-item">
@@ -1782,12 +1796,21 @@ export function AdminPageClient({ initialSection = 'overview' }: { initialSectio
 ) : null}
 
             {activeSection === 'payments' ? (
-<SectionCard title="Pagamentos" description="Status do Mercado Pago, volume de pagamentos e ticket médio.">
+<SectionCard title="Pagamentos" description="Provedor ativo, volume de pagamentos e ticket médio.">
               {adminSettings ? (
                 <div className="summary-items summary-items-flush">
                   <div className="summary-item admin-order-item">
                     <div>
-                      <h5>Mercado Pago</h5>
+                      <h5>Asaas {adminSettings.integrations.paymentProvider === 'asaas' ? '(ativo)' : ''}</h5>
+                      <div className="meta">{adminSettings.integrations.asaas.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - {adminSettings.integrations.asaas.devMode ? 'sandbox/dev ativo' : adminSettings.integrations.asaas.env} - webhook {adminSettings.integrations.asaas.webhookConfigured ? 'ok' : 'pendente'}</div>
+                    </div>
+                    <StatusBadge tone={adminSettings.integrations.asaas.configured ? 'success' : 'warning'}>
+                      {adminSettings.integrations.asaas.configured ? 'OK' : 'PENDENTE'}
+                    </StatusBadge>
+                  </div>
+                  <div className="summary-item admin-order-item">
+                    <div>
+                      <h5>Mercado Pago {adminSettings.integrations.paymentProvider === 'mercado_pago' ? '(ativo)' : '(legado)'}</h5>
                       <div className="meta">{adminSettings.integrations.mercadoPago.configured ? 'credenciais configuradas' : 'credenciais pendentes'} - {adminSettings.integrations.mercadoPago.devMode ? 'sandbox/dev ativo' : 'produção real'} - webhook {adminSettings.integrations.mercadoPago.webhookConfigured ? 'ok' : 'pendente'}</div>
                     </div>
                     <StatusBadge tone={adminSettings.integrations.mercadoPago.configured ? 'success' : 'warning'}>

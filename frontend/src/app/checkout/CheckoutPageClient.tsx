@@ -63,6 +63,7 @@ function paymentLabel(payment: string) {
   switch (payment) {
     case 'card': return 'Cartão';
     case 'mercado-pago': return 'Mercado Pago';
+    case 'asaas': return 'Pix, cartão ou boleto';
     case 'pix': return 'Pix';
     case 'boleto': return 'Boleto';
     default: return payment;
@@ -347,14 +348,15 @@ export function CheckoutPageClient() {
       trackEvent('Purchase', { value: order.total, currency: 'BRL', order_id: order.id });
       clearCart();
 
-      if (savedRemotely && payment === 'mercado-pago') {
+      if (savedRemotely) {
         try {
           const preference = await createPaymentPreference(order.id);
-          notify('Redirecionando para o Mercado Pago.', 'success');
+          const target = preference.provider === 'asaas' ? 'o checkout Asaas' : 'o Mercado Pago';
+          notify(`Redirecionando para ${target}.`, 'success');
           window.location.href = preference.initPoint;
           return;
         } catch (err) {
-          notify(err instanceof Error ? err.message : 'Nao foi possivel iniciar Mercado Pago.', 'error');
+          notify(err instanceof Error ? err.message : 'Nao foi possivel iniciar o pagamento.', 'error');
         }
       }
 

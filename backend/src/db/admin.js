@@ -40,6 +40,13 @@ function buildAdminSettings(env = process.env) {
       legacyAdminUnlockEnabled: String(env.LEGACY_ADMIN_UNLOCK_ENABLED).toLowerCase() !== 'false' && hasSecret(env.ADMIN_SECRET),
     },
     integrations: {
+      paymentProvider: String(env.PAYMENT_PROVIDER || 'mercado_pago').toLowerCase() === 'asaas' ? 'asaas' : 'mercado_pago',
+      asaas: {
+        configured: hasSecret(env.ASAAS_API_KEY),
+        devMode: boolEnv(env.ASAAS_DEV_MODE, !hasSecret(env.ASAAS_API_KEY)),
+        webhookConfigured: hasSecret(env.ASAAS_WEBHOOK_TOKEN),
+        env: hasSecret(env.ASAAS_API_KEY) && !/sandbox/i.test(env.ASAAS_API_URL || '') ? 'production' : 'sandbox',
+      },
       mercadoPago: {
         configured: hasSecret(env.MERCADO_PAGO_ACCESS_TOKEN),
         devMode: boolEnv(env.MERCADO_PAGO_DEV_MODE, true) || !hasSecret(env.MERCADO_PAGO_ACCESS_TOKEN),

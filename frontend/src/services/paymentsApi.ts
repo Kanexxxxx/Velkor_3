@@ -2,7 +2,7 @@ import { API_BASE_URL } from '@/services/api';
 import { getGuestSessionId } from '@/services/guestSession';
 
 export interface PaymentPreference {
-  provider: 'mercado_pago';
+  provider: 'mercado_pago' | 'asaas';
   preferenceId: string;
   initPoint: string;
   sandbox: boolean;
@@ -23,6 +23,6 @@ export async function createPaymentPreference(orderId: string): Promise<PaymentP
     cache: 'no-store',
   });
   const data = await response.json().catch(() => ({})) as { error?: string };
-  if (!response.ok) throw new Error(data.error ?? 'Nao foi possivel iniciar Mercado Pago.');
+  if (!response.ok) throw new Error(data.error ?? 'Nao foi possivel iniciar o pagamento.');
   return data as PaymentPreference;
 }

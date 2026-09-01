@@ -72,6 +72,8 @@ export interface AdminSettings {
     legacyAdminUnlockEnabled: boolean;
   };
   integrations: {
+    paymentProvider: 'mercado_pago' | 'asaas';
+    asaas: { configured: boolean; devMode: boolean; webhookConfigured: boolean; env: string };
     mercadoPago: { configured: boolean; devMode: boolean; webhookConfigured: boolean };
     email: { configured: boolean; devMode: boolean; user: string };
     melhorEnvio: { configured: boolean; env: string; originCepConfigured: boolean };
@@ -331,6 +333,7 @@ export async function updateNewsletterSubscriber(id: string, patch: Partial<Pick
 }
 
 export interface AdminPaymentPreference {
+  provider?: 'mercado_pago' | 'asaas';
   preferenceId: string;
   initPoint: string;
   sandbox: boolean;
