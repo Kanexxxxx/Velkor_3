@@ -344,3 +344,16 @@ Recommended workflow:
 # License
 
 Private project — VOLKERR.
+
+
+## Versões e manutenção
+
+A apresentação usa VOLKER e o histórico contém VELKOR/Velkor. A padronização de
+identidade depende da decisão do responsável; esta documentação não renomeia o produto.
+Compare versões locais antes de integrar alterações: nome de pasta ou número de versão
+não demonstra que uma cópia pode ser descartada.
+
+Para validar, confira os scripts dos `package.json` da raiz, `backend/` e `frontend/`.
+Execute testes backend, tipos, lint, build e E2E na versão escolhida. Use dados fictícios
+e sandbox para pagamento, frete e e-mail; a existência de uma integração no código não
+confirma entrega, pagamento real ou disponibilidade de produção.
